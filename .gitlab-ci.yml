@@ -1,0 +1,68 @@
+stages: [test, build, checksums]
+
+default:
+  image: python:3.11
+
+test:
+  stage: test
+  script:
+    - pip install -e ".[dev]"
+    - ruff check .
+    - pytest
+
+.build:
+  stage: build
+  script:
+    - pip install -e ".[dev]"
+    - pyinstaller repotask.spec
+    - python scripts/binary_smoke.py dist/repo-task
+  artifacts:
+    paths: [dist/]
+  rules:
+    - if: $CI_COMMIT_TAG
+
+build-linux-x64:
+  extends: .build
+  tags: [linux-x64]
+
+build-macos-arm64:
+  extends: .build
+  tags: [macos-arm64]
+
+build-macos-x64:
+  extends: .build
+  tags: [macos-x64]
+
+build-windows-x64:
+  extends: .build
+  tags: [windows-x64]
+  script:
+    - pip install -e ".[dev]"
+    - pyinstaller repotask.spec
+    - python scripts/binary_smoke.py dist\repo-task.exe
+
+build-source:
+  stage: build
+  script:
+    - pip install build
+    - python -m build
+  artifacts:
+    paths: [dist/*.tar.gz, dist/*.whl]
+  rules:
+    - if: $CI_COMMIT_TAG
+
+checksums:
+  stage: checksums
+  image: alpine:3.20
+  needs:
+    - build-linux-x64
+    - build-macos-arm64
+    - build-macos-x64
+    - build-windows-x64
+    - build-source
+  script:
+    - find dist -type f -exec sha256sum {} + > SHA256SUMS
+  artifacts:
+    paths: [SHA256SUMS]
+  rules:
+    - if: $CI_COMMIT_TAG

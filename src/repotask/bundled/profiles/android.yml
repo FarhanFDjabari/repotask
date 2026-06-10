@@ -1,0 +1,13 @@
+conditional_agents:
+  room-migration-reviewer:
+    keywords: [room, migration, database, schema]
+    paths: ["**/schemas/*.json", "*Database.kt"]
+    phases: [investigate, review]
+  lifecycle-reviewer:
+    keywords: [coroutine, flow, lifecycle, stateflow]
+    paths: ["*.kt"]
+    phases: [investigate, review]
+review_detectors:
+  room:
+    paths: ["**/schemas/*.json", "*Database.kt"]
+

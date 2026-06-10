@@ -1,0 +1,6 @@
+conditional_agents:
+  ui-reviewer:
+    keywords: [compose, ui, screen, layout, button, form]
+    paths: ["*.kt"]
+    phases: [investigate, review]
+

@@ -1,0 +1,6 @@
+conditional_agents:
+  ui-reviewer:
+    keywords: [ui, screen, layout, accessibility, form]
+    paths: ["*.tsx", "*.jsx", "*.css", "*.scss"]
+    phases: [investigate, review]
+
