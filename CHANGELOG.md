@@ -5,5 +5,4 @@
 - Initial standalone RepoTask Milestone 1 implementation.
 - Provider-neutral initialization, task workspaces, prompts, review, status, and CR workflows.
 - GitLab and GitHub local CLI change-request creation.
-- PyInstaller and dual GitHub/GitLab CI release configuration.
-
+- Single universal wheel published through GitHub and GitLab repository releases.

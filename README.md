@@ -8,7 +8,37 @@ approval gates human-controlled.
 ## Status
 
 Milestone 1 starts at version `0.1.0`. Python 3.11 or newer is required for source installs.
-User-facing releases are distributed as one-file native binaries built on their target OS.
+User-facing releases are distributed as one universal pure-Python wheel attached to the
+repository release.
+
+## Install From A Repository Release
+
+Download `repotask-<version>-py3-none-any.whl` from the GitHub or GitLab release page, then install
+it as an isolated command-line tool:
+
+```bash
+pipx install ./repotask-0.1.0-py3-none-any.whl
+```
+
+Alternatively, use uv:
+
+```bash
+uv tool install ./repotask-0.1.0-py3-none-any.whl
+```
+
+For a public GitHub release, `pipx` can install the wheel directly from its release URL:
+
+```bash
+pipx install \
+  https://github.com/OWNER/repotask/releases/download/v0.1.0/repotask-0.1.0-py3-none-any.whl
+```
+
+For a private repository, download the authenticated release asset first, then install the local
+wheel. The installed command is available as:
+
+```bash
+repo-task --version
+```
 
 ## Install From Source
 
@@ -97,14 +127,15 @@ descriptions only.
 RepoTask never merges, approves, changes task status, resolves conflicts, deploys, releases, or
 makes QA decisions automatically.
 
-## Release Prerequisites
+## Releases
 
-Native binaries must be built on macOS arm64/x64, Linux x64, and Windows x64. Public macOS
-artifacts require Developer ID signing and notarization credentials. Windows signing is supported
-when a certificate is available. Release jobs generate `SHA256SUMS`; there is no self-update or
-automatic version check.
+A `v*` tag builds `repotask-<version>-py3-none-any.whl` once, verifies that it is platform-neutral,
+smoke-installs it, and attaches it to the matching GitHub or GitLab repository release. The same
+wheel works on macOS, Linux, and Windows with Python 3.11 or newer.
+
+No public package registry, platform-specific binary, signing certificate, notarization, or
+self-update mechanism is required.
 
 ## License
 
 Apache-2.0.
-

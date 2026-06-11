@@ -8,138 +8,37 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: macos-14
-            artifact: macos-arm64
-            archive: tar.gz
-          - os: macos-13
-            artifact: macos-x64
-            archive: tar.gz
-          - os: ubuntu-latest
-            artifact: linux-x64
-            archive: tar.gz
-          - os: windows-latest
-            artifact: windows-x64
-            archive: zip
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: python -m pip install -e ".[dev]"
-      - run: pyinstaller repotask.spec
-      - run: python scripts/binary_smoke.py dist/repo-task
-        if: runner.os != 'Windows'
-      - run: python scripts/binary_smoke.py dist/repo-task.exe
-        if: runner.os == 'Windows'
-      - name: Sign macOS binary
-        if: runner.os == 'macOS'
-        env:
-          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
-        run: |
-          test -n "$APPLE_CERTIFICATE_P12"
-          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > certificate.p12
-          security create-keychain -p temporary build.keychain
-          security import certificate.p12 -k build.keychain \
-            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security list-keychains -d user -s build.keychain
-          security unlock-keychain -p temporary build.keychain
-          security set-key-partition-list -S apple-tool:,apple: \
-            -s -k temporary build.keychain
-          codesign --force --options runtime --timestamp \
-            --sign "$APPLE_DEVELOPER_ID" dist/repo-task
-          codesign --verify --verbose dist/repo-task
-      - name: Create Unix archive
-        if: runner.os != 'Windows'
-        run: |
-          tar -czf repo-task-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz \
-            -C dist repo-task
-      - name: Notarize macOS archive
-        if: runner.os == 'macOS'
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          test -n "$APPLE_ID"
-          xcrun notarytool submit \
-            repo-task-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_APP_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait
-      - name: Create Windows archive
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        run: |
-          if (-not $env:WINDOWS_CERTIFICATE_PFX) {
-            throw "WINDOWS_CERTIFICATE_PFX is required for tagged public releases."
-          }
-          $bytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_PFX)
-          [IO.File]::WriteAllBytes("certificate.pfx", $bytes)
-          $password = ConvertTo-SecureString `
-            -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
-          $certificate = Import-PfxCertificate -FilePath certificate.pfx `
-            -CertStoreLocation Cert:\CurrentUser\My -Password $password
-          $signature = Set-AuthenticodeSignature -FilePath dist/repo-task.exe `
-            -Certificate $certificate -TimestampServer http://timestamp.digicert.com `
-            -HashAlgorithm SHA256
-          if ($signature.Status -ne "Valid") {
-            throw "Windows signature failed: $($signature.StatusMessage)"
-          }
-          Compress-Archive -Path dist/repo-task.exe `
-            -DestinationPath repo-task-${{ github.ref_name }}-${{ matrix.artifact }}.zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: repo-task-${{ github.ref_name }}-${{ matrix.artifact }}
-          path: repo-task-${{ github.ref_name }}-${{ matrix.artifact }}.${{ matrix.archive }}
-
-  source:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m pip install build
-      - run: python -m build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: repo-task-${{ github.ref_name }}-source
-          path: dist/*
+      - name: Build universal wheel
+        run: |
+          python -m pip install build
+          python -m build --wheel
+      - name: Verify universal wheel
+        run: |
+          python - <<'PY'
+          from pathlib import Path
 
-  checksums:
-    needs: [build, source]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - run: find artifacts -type f -exec sha256sum {} + > SHA256SUMS
-      - uses: actions/upload-artifact@v4
-        with:
-          name: SHA256SUMS
-          path: SHA256SUMS
-
-  publish:
-    needs: checksums
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: release-files
-      - uses: softprops/action-gh-release@v2
+          wheels = list(Path("dist").glob("*.whl"))
+          assert len(wheels) == 1, f"Expected one wheel, found: {wheels}"
+          assert wheels[0].name.endswith("-py3-none-any.whl"), wheels[0].name
+          print(wheels[0])
+          PY
+      - name: Smoke install wheel
+        run: |
+          python -m venv wheel-smoke
+          wheel-smoke/bin/python -m pip install dist/*.whl
+          wheel-smoke/bin/repo-task --version
+          wheel-smoke/bin/repo-task --help
+      - name: Publish repository release
+        uses: softprops/action-gh-release@v2
         with:
           draft: false
-          prerelease: true
-          files: |
-            release-files/**/*
+          prerelease: false
+          generate_release_notes: true
+          files: dist/*.whl
