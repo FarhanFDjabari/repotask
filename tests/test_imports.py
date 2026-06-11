@@ -35,8 +35,13 @@ def test_accepts_utf8_markdown(git_repo: Path) -> None:
     assert content == "# Rules\n"
 
 
+def test_normalizes_imported_newlines(git_repo: Path) -> None:
+    (git_repo / "rules.md").write_bytes(b"# Rules\r\n\rMore\r")
+    _source, content = validate_import(git_repo, "rules.md")
+    assert content == "# Rules\n\nMore\n"
+
+
 def test_rejects_oversized_text(git_repo: Path) -> None:
     (git_repo / "large.md").write_text("x" * 1_000_001, encoding="utf-8")
     with pytest.raises(RepoTaskError, match="exceeds"):
         validate_import(git_repo, "large.md")
-
