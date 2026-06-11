@@ -92,9 +92,10 @@ def validate_import(root: Path, relative_path: str) -> tuple[Path, str]:
     if b"\x00" in content:
         raise RepoTaskError(f"Refusing to import binary file: {relative_path}")
     try:
-        return resolved, content.decode("utf-8")
+        decoded = content.decode("utf-8")
     except UnicodeDecodeError as error:
         raise RepoTaskError(f"Import is not UTF-8 text: {relative_path}") from error
+    return resolved, decoded.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def normalized_agent_role(path: str) -> str | None:

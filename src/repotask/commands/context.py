@@ -88,7 +88,6 @@ def _replace_description(context: str, description: str) -> str:
     replacement = f"## Description\n\n{description.strip()}\n"
     pattern = r"## Description\s*.*?(?=\n## |\Z)"
     if re.search(pattern, context, flags=re.DOTALL):
-        updated = re.sub(pattern, replacement, context, count=1, flags=re.DOTALL)
+        updated = re.sub(pattern, lambda _match: replacement, context, count=1, flags=re.DOTALL)
         return updated if updated.endswith("\n") else updated + "\n"
     return context.rstrip() + "\n\n" + replacement
-
