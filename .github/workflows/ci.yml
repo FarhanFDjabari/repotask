@@ -20,3 +20,14 @@ jobs:
       - run: ruff check .
       - run: pytest
 
+  binary-smoke-macos:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[dev]"
+      - run: pyinstaller --clean --noconfirm repotask.spec
+      - run: python scripts/binary_smoke.py dist/repo-task
