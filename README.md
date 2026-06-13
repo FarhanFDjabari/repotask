@@ -8,36 +8,35 @@ approval gates human-controlled.
 ## Status
 
 Milestone 1 starts at version `0.1.0`. Python 3.11 or newer is required for source installs.
-User-facing releases are distributed as one universal pure-Python wheel attached to the
-repository release.
+Tagged releases publish a self-contained macOS Apple Silicon binary. Linux and Windows binaries
+can be built manually with the included GitHub Actions workflow or locally on the target platform.
 
-## Install From A Repository Release
+## Project-Local Installation
 
-Download `repotask-<version>-py3-none-any.whl` from the GitHub or GitLab release page, then install
-it as an isolated command-line tool:
+Keep a separate RepoTask binary inside each project so projects can pin different versions without
+installing RepoTask globally. From the target Git repository:
 
 ```bash
-pipx install ./repotask-0.1.0-py3-none-any.whl
+mkdir -p .repo-task-bin
+printf '%s\n' '.repo-task-bin/' >> .git/info/exclude
 ```
 
-Alternatively, use uv:
+Download `repo-task-v<version>-macos-arm64.tar.gz` from the GitHub release page and extract it:
 
 ```bash
-uv tool install ./repotask-0.1.0-py3-none-any.whl
+tar -xzf ~/Downloads/repo-task-v0.1.0-macos-arm64.tar.gz -C .repo-task-bin
+chmod +x .repo-task-bin/repo-task
+./.repo-task-bin/repo-task --version
 ```
 
-For a public GitHub release, `pipx` can install the wheel directly from its release URL:
+`.git/info/exclude` is local to the clone, so the binary neither appears in `git status` nor gets
+committed. This is required because `repo-task start` intentionally requires a clean worktree.
+
+If macOS blocks the downloaded binary, verify that it came from this repository release and remove
+the quarantine attribute:
 
 ```bash
-pipx install \
-  https://github.com/OWNER/repotask/releases/download/v0.1.0/repotask-0.1.0-py3-none-any.whl
-```
-
-For a private repository, download the authenticated release asset first, then install the local
-wheel. The installed command is available as:
-
-```bash
-repo-task --version
+xattr -d com.apple.quarantine .repo-task-bin/repo-task
 ```
 
 ## Install From Source
@@ -129,12 +128,60 @@ makes QA decisions automatically.
 
 ## Releases
 
-A `v*` tag builds `repotask-<version>-py3-none-any.whl` once, verifies that it is platform-neutral,
-smoke-installs it, and attaches it to the matching GitHub or GitLab repository release. The same
-wheel works on macOS, Linux, and Windows with Python 3.11 or newer.
+A `v*` tag automatically builds, smoke-tests, and publishes:
 
-No public package registry, platform-specific binary, signing certificate, notarization, or
-self-update mechanism is required.
+```text
+repo-task-v<version>-macos-arm64.tar.gz
+```
+
+The macOS artifact is built on GitHub's `macos-14` arm64 runner. It is self-contained and does not
+require Python on the user's machine. It is ad-hoc signed, but not Developer ID signed or notarized.
+
+### Build Linux Or Windows With GitHub Actions
+
+Linux and Windows builds do not run automatically:
+
+1. Open the repository's **Actions** tab.
+2. Select **Build Native Binary**.
+3. Choose **Run workflow**.
+4. Select `linux-x64`, `windows-x64`, or `all`.
+5. Download the generated workflow artifact.
+
+The manually generated artifacts are retained by GitHub Actions for 14 days:
+
+```text
+repo-task-linux-x64.tar.gz
+repo-task-windows-x64.zip
+```
+
+Extract the selected binary into the target project's `.repo-task-bin/` directory and add that
+directory to `.git/info/exclude` as shown above.
+
+### Build Locally On A Target Platform
+
+PyInstaller must run on the same operating system as the binary it produces:
+
+```bash
+python3.11 -m venv .build-venv
+. .build-venv/bin/activate
+python -m pip install -e '.[dev]'
+pyinstaller --clean --noconfirm repotask.spec
+```
+
+On Linux and macOS, the result is `dist/repo-task`. On Windows, it is
+`dist\repo-task.exe`. Run the smoke test before distributing it:
+
+```bash
+python scripts/binary_smoke.py dist/repo-task
+```
+
+On Windows:
+
+```powershell
+python scripts/binary_smoke.py dist\repo-task.exe
+```
+
+There is no self-update mechanism. Replace the project-local binary when changing versions.
 
 ## License
 

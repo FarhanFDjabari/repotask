@@ -1,4 +1,4 @@
-stages: [test, build, release]
+stages: [test]
 
 default:
   image: python:3.11
@@ -9,53 +9,3 @@ test:
     - pip install -e ".[dev]"
     - ruff check .
     - pytest
-
-build-wheel:
-  stage: build
-  script:
-    - pip install build
-    - python -m build --wheel
-    - |
-      python - <<'PY'
-      from pathlib import Path
-
-      wheels = list(Path("dist").glob("*.whl"))
-      assert len(wheels) == 1, f"Expected one wheel, found: {wheels}"
-      assert wheels[0].name.endswith("-py3-none-any.whl"), wheels[0].name
-      print(wheels[0])
-      PY
-    - python -m venv wheel-smoke
-    - wheel-smoke/bin/python -m pip install dist/*.whl
-    - wheel-smoke/bin/repo-task --version
-    - basename dist/*.whl | sed 's/^/WHEEL_FILE=/' > wheel.env
-  artifacts:
-    paths:
-      - dist/*.whl
-    reports:
-      dotenv: wheel.env
-  rules:
-    - if: $CI_COMMIT_TAG
-
-release-wheel:
-  stage: release
-  image: registry.gitlab.com/gitlab-org/cli:latest
-  needs:
-    - job: build-wheel
-      artifacts: true
-  script:
-    - test -f "dist/${WHEEL_FILE}"
-  artifacts:
-    paths:
-      - dist/*.whl
-    expire_in: never
-  release:
-    tag_name: $CI_COMMIT_TAG
-    name: RepoTask $CI_COMMIT_TAG
-    description: Universal Python wheel for RepoTask $CI_COMMIT_TAG.
-    assets:
-      links:
-        - name: RepoTask universal wheel
-          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/dist/${WHEEL_FILE}"
-          link_type: package
-  rules:
-    - if: $CI_COMMIT_TAG

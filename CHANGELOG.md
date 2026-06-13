@@ -5,4 +5,5 @@
 - Initial standalone RepoTask Milestone 1 implementation.
 - Provider-neutral initialization, task workspaces, prompts, review, status, and CR workflows.
 - GitLab and GitHub local CLI change-request creation.
-- Single universal wheel published through GitHub and GitLab repository releases.
+- Project-local native distribution with automatic macOS arm64 releases.
+- Manually dispatched GitHub Actions builds for Linux x64 and Windows x64.
