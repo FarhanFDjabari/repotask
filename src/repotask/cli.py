@@ -1,12 +1,10 @@
-"""RepoTask Typer command line interface."""
+"""RepoTask argparse command line interface."""
 
 from __future__ import annotations
 
+import argparse
+import sys
 from pathlib import Path
-from typing import Annotated
-
-import typer
-from rich.console import Console
 
 from repotask import __version__
 from repotask.commands.change_request import change_request
@@ -19,155 +17,212 @@ from repotask.commands.review import review
 from repotask.commands.start import start_task
 from repotask.commands.status import task_status
 from repotask.errors import RepoTaskError
-
-app = typer.Typer(
-    name="repo-task",
-    help="Provider-neutral, human-controlled developer workflow CLI.",
-    no_args_is_help=True,
-    pretty_exceptions_enable=False,
-)
-console = Console()
+from repotask.terminal import print_error
 
 
-def _version(value: bool) -> None:
-    if value:
-        typer.echo(f"repo-task {__version__}")
-        raise typer.Exit()
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="repo-task",
+        description="Provider-neutral, human-controlled developer workflow CLI.",
+    )
+    parser.add_argument("--version", action="store_true", help="Show version and exit.")
+    parser.add_argument(
+        "--show-completion",
+        nargs="?",
+        const="bash",
+        choices=("bash", "zsh", "fish"),
+        help="Show a static shell completion script.",
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    init_parser = subparsers.add_parser("init", help="Discover and initialize RepoTask.")
+    init_parser.add_argument("--dry-run", action="store_true", help="Preview without writing.")
+    init_parser.add_argument("--answers", type=Path, help="Read setup answers from a YAML file.")
+    init_parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Require provider selection from answers.",
+    )
+    init_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Replace only manifest-owned files and create backups.",
+    )
+    init_parser.add_argument("--yes", action="store_true", help=argparse.SUPPRESS)
+    init_parser.set_defaults(func=_cmd_init)
+
+    doctor_parser = subparsers.add_parser("doctor", help="Check configuration and tooling.")
+    doctor_parser.set_defaults(func=_cmd_doctor)
+
+    start_parser = subparsers.add_parser(
+        "start", help="Create a clean feature branch and local task workspace."
+    )
+    start_parser.add_argument("task_id", metavar="TASK_ID")
+    start_parser.add_argument("--title", required=True, help="Task title.")
+    start_parser.add_argument("--mode", default="human", help="Implementation mode.")
+    start_parser.set_defaults(func=_cmd_start)
+
+    context_parser = subparsers.add_parser(
+        "context", help="Update task context or generate its prompt."
+    )
+    context_parser.add_argument("task_id", metavar="TASK_ID")
+    context_group = context_parser.add_mutually_exclusive_group(required=True)
+    context_group.add_argument(
+        "--paste", action="store_true", help="Read requirement text from stdin."
+    )
+    context_group.add_argument("--from-file", type=Path, help="Read requirement text from a file.")
+    context_group.add_argument("--prompt", action="store_true", help="Generate a context prompt.")
+    context_parser.set_defaults(func=_cmd_context)
+
+    investigate_parser = subparsers.add_parser(
+        "investigate", help="Generate an investigation prompt."
+    )
+    investigate_parser.add_argument("task_id", metavar="TASK_ID")
+    investigate_parser.set_defaults(func=_cmd_investigate)
+
+    review_parser = subparsers.add_parser(
+        "review", help="Generate a diff-aware senior review prompt."
+    )
+    review_parser.add_argument("task_id", metavar="TASK_ID")
+    review_parser.add_argument(
+        "--worktree",
+        action="store_true",
+        help="Include staged and unstaged tracked changes.",
+    )
+    review_parser.set_defaults(func=_cmd_review)
+
+    cr_parser = subparsers.add_parser(
+        "cr", help="Generate or create a provider-neutral change request."
+    )
+    cr_parser.add_argument("task_id", metavar="TASK_ID")
+    cr_parser.add_argument(
+        "--create",
+        action="store_true",
+        help="Create via the configured local VCS CLI.",
+    )
+    cr_parser.add_argument("--draft", action="store_true", help="With --create, open as draft.")
+    cr_parser.set_defaults(func=_cmd_cr)
+
+    status_parser = subparsers.add_parser("status", help="Show local task workflow status.")
+    status_parser.add_argument("task_id", metavar="TASK_ID")
+    status_parser.add_argument(
+        "--provider",
+        action="store_true",
+        help="Write a read-only provider reconciliation prompt.",
+    )
+    status_parser.set_defaults(func=_cmd_status)
+
+    list_parser = subparsers.add_parser("list", help="List task workspaces.")
+    list_parser.set_defaults(func=_cmd_list)
+    return parser
 
 
-@app.callback()
-def main(
-    version: Annotated[
-        bool | None,
-        typer.Option("--version", callback=_version, is_eager=True, help="Show version and exit."),
-    ] = None,
-) -> None:
-    """RepoTask commands."""
+def _cmd_init(args: argparse.Namespace) -> int:
+    if args.answers and not args.answers.is_file():
+        raise RepoTaskError(f"Answers file not found: {args.answers}")
+    initialize(args.answers, args.non_interactive, args.dry_run, args.force, assume_yes=args.yes)
+    return 0
 
 
-@app.command("init")
-def init_command(
-    dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing.")] = False,
-    answers: Annotated[
-        Path | None,
-        typer.Option("--answers", exists=True, dir_okay=False, readable=True),
-    ] = None,
-    non_interactive: Annotated[
-        bool,
-        typer.Option("--non-interactive", help="Require provider selection from answers."),
-    ] = False,
-    force: Annotated[
-        bool,
-        typer.Option("--force", help="Replace only manifest-owned files and create backups."),
-    ] = False,
-    yes: Annotated[bool, typer.Option("--yes", hidden=True)] = False,
-) -> None:
-    """Discover and initialize RepoTask at the Git root."""
-    initialize(answers, non_interactive, dry_run, force, assume_yes=yes)
+def _cmd_doctor(_args: argparse.Namespace) -> int:
+    return 0 if run_doctor() else 1
 
 
-@app.command()
-def doctor() -> None:
-    """Check configuration, assets, Git, and CR tooling."""
-    if not run_doctor():
-        raise typer.Exit(1)
+def _cmd_start(args: argparse.Namespace) -> int:
+    branch, workspace = start_task(args.task_id, args.title, args.mode)
+    print(f"Created branch {branch}")
+    print(f"Created task workspace {workspace}")
+    return 0
 
 
-@app.command()
-def start(
-    task_id: Annotated[str, typer.Argument(metavar="TASK_ID")],
-    title: Annotated[str, typer.Option("--title", help="Task title.")],
-    mode: Annotated[str, typer.Option("--mode", help="Implementation mode.")] = "human",
-) -> None:
-    """Create a clean feature branch and local task workspace."""
-    branch, workspace = start_task(task_id, title, mode)
-    console.print(f"Created branch {branch}")
-    console.print(f"Created task workspace {workspace}")
+def _cmd_context(args: argparse.Namespace) -> int:
+    if args.from_file and not args.from_file.is_file():
+        raise RepoTaskError(f"Context file not found: {args.from_file}")
+    path = update_context(args.task_id, args.paste, args.from_file, args.prompt)
+    print(f"{'Wrote' if args.prompt else 'Updated'} {path}")
+    return 0
 
 
-@app.command("context")
-def context_command(
-    task_id: Annotated[str, typer.Argument(metavar="TASK_ID")],
-    paste: Annotated[
-        bool, typer.Option("--paste", help="Read requirement text from stdin.")
-    ] = False,
-    from_file: Annotated[
-        Path | None, typer.Option("--from-file", dir_okay=False, readable=True)
-    ] = None,
-    prompt_only: Annotated[
-        bool, typer.Option("--prompt", help="Generate a context preparation prompt.")
-    ] = False,
-) -> None:
-    """Update task context or generate its prompt."""
-    selected = sum((paste, from_file is not None, prompt_only))
-    if selected != 1:
-        raise RepoTaskError("Choose exactly one of --paste, --from-file, or --prompt.")
-    path = update_context(task_id, paste, from_file, prompt_only)
-    console.print(f"{'Wrote' if prompt_only else 'Updated'} {path}")
+def _cmd_investigate(args: argparse.Namespace) -> int:
+    print(f"Wrote {investigate(args.task_id)}")
+    return 0
 
 
-@app.command("investigate")
-def investigate_command(
-    task_id: Annotated[str, typer.Argument(metavar="TASK_ID")],
-) -> None:
-    """Generate an investigation prompt."""
-    console.print(f"Wrote {investigate(task_id)}")
+def _cmd_review(args: argparse.Namespace) -> int:
+    print(f"Wrote {review(args.task_id, args.worktree)}")
+    return 0
 
 
-@app.command("review")
-def review_command(
-    task_id: Annotated[str, typer.Argument(metavar="TASK_ID")],
-    worktree: Annotated[
-        bool, typer.Option("--worktree", help="Include staged and unstaged tracked changes.")
-    ] = False,
-) -> None:
-    """Generate a diff-aware senior review prompt."""
-    console.print(f"Wrote {review(task_id, worktree)}")
-
-
-@app.command("cr")
-def cr_command(
-    task_id: Annotated[str, typer.Argument(metavar="TASK_ID")],
-    create: Annotated[
-        bool, typer.Option("--create", help="Create via the configured local VCS CLI.")
-    ] = False,
-    draft: Annotated[
-        bool, typer.Option("--draft", help="With --create, open as draft.")
-    ] = False,
-) -> None:
-    """Generate or create a provider-neutral change request."""
-    if draft and not create:
+def _cmd_cr(args: argparse.Namespace) -> int:
+    if args.draft and not args.create:
         raise RepoTaskError("--draft requires --create.")
-    for output in change_request(task_id, create, draft):
-        console.print(f"Wrote {output}" if not create else output)
+    for output in change_request(args.task_id, args.create, args.draft):
+        print(f"Wrote {output}" if not args.create else output)
+    return 0
 
 
-@app.command("status")
-def status_command(
-    task_id: Annotated[str, typer.Argument(metavar="TASK_ID")],
-    provider: Annotated[
-        bool, typer.Option("--provider", help="Write a read-only provider reconciliation prompt.")
-    ] = False,
-) -> None:
-    """Show local task workflow status."""
-    path = task_status(task_id, provider)
+def _cmd_status(args: argparse.Namespace) -> int:
+    path = task_status(args.task_id, args.provider)
     if path:
-        console.print(f"Wrote {path}")
+        print(f"Wrote {path}")
+    return 0
 
 
-@app.command("list")
-def list_command() -> None:
-    """List task workspaces."""
+def _cmd_list(_args: argparse.Namespace) -> int:
     list_tasks()
+    return 0
 
 
-def run() -> None:
+def run(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.version:
+        print(f"repo-task {__version__}")
+        return 0
+    if args.show_completion:
+        print(_completion_script(args.show_completion).rstrip())
+        return 0
+    if not args.command:
+        parser.print_help()
+        return 0
     try:
-        app()
+        return int(args.func(args))
     except RepoTaskError as error:
-        console.print(f"[red]Error:[/red] {error}", err=True)
-        raise typer.Exit(1) from error
+        print_error(str(error))
+        return 1
+    except KeyboardInterrupt:
+        print("Interrupted.", file=sys.stderr)
+        return 130
+
+
+def _completion_script(shell: str) -> str:
+    commands = "init doctor start context investigate review cr status list"
+    options = "--version --show-completion"
+    if shell == "zsh":
+        return f"""#compdef repo-task
+
+_repo_task() {{
+  local -a commands
+  commands=({commands})
+  _arguments '1:command:(({commands}))' '*::arg:->args'
+}}
+compdef _repo_task repo-task
+"""
+    if shell == "fish":
+        lines = [f"complete -c repo-task -l {option[2:]}" for option in options.split()]
+        lines.extend(f"complete -c repo-task -f -a {command}" for command in commands.split())
+        return "\n".join(lines) + "\n"
+    return f"""_repo_task_completion() {{
+  local cur
+  COMPREPLY=()
+  cur="${{COMP_WORDS[COMP_CWORD]}}"
+  if [[ $COMP_CWORD -eq 1 ]]; then
+    COMPREPLY=( $(compgen -W "{options} {commands}" -- "$cur") )
+  fi
+}}
+complete -F _repo_task_completion repo-task
+"""
 
 
 if __name__ == "__main__":
-    run()
+    raise SystemExit(run())

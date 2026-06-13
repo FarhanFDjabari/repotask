@@ -7,49 +7,50 @@ approval gates human-controlled.
 
 ## Status
 
-Milestone 1 starts at version `0.1.0`. Python 3.11 or newer is required for source installs.
-Tagged releases publish a self-contained macOS Apple Silicon binary. Linux and Windows binaries
-can be built manually with the included GitHub Actions workflow or locally on the target platform.
+Milestone 1 starts at version `0.1.0`. RepoTask ships as a single portable Python file with no
+third-party dependencies. The only requirement is Python 3.9 or newer already on the machine —
+the version bundled with current macOS satisfies this, so no extra install is needed.
 
 ## Project-Local Installation
 
-Keep a separate RepoTask binary inside each project so projects can pin different versions without
-installing RepoTask globally. From the target Git repository:
+`repo-task` is a self-contained Python [zipapp](https://docs.python.org/3/library/zipapp.html): one
+executable file of a few dozen KB. Keep a copy inside each project so projects can pin different
+versions without installing RepoTask globally. From the target Git repository:
 
 ```bash
 mkdir -p .repo-task-bin
 printf '%s\n' '.repo-task-bin/' >> .git/info/exclude
 ```
 
-Download `repo-task-v<version>-macos-arm64.tar.gz` from the GitHub release page and extract it:
+Download `repo-task-v<version>.tar.gz` from the GitHub release page and extract it:
 
 ```bash
-tar -xzf ~/Downloads/repo-task-v0.1.0-macos-arm64.tar.gz -C .repo-task-bin
+tar -xzf ~/Downloads/repo-task-v0.1.0.tar.gz -C .repo-task-bin
 chmod +x .repo-task-bin/repo-task
 ./.repo-task-bin/repo-task --version
 ```
 
-`.git/info/exclude` is local to the clone, so the binary neither appears in `git status` nor gets
-committed. This is required because `repo-task start` intentionally requires a clean worktree.
-
-If macOS blocks the downloaded binary, verify that it came from this repository release and remove
-the quarantine attribute:
+The file runs through the system `python3` via its shebang. To pin a specific interpreter, run it
+explicitly:
 
 ```bash
-xattr -d com.apple.quarantine .repo-task-bin/repo-task
+python3 .repo-task-bin/repo-task --version
 ```
+
+`.git/info/exclude` is local to the clone, so the file neither appears in `git status` nor gets
+committed. This is required because `repo-task start` intentionally requires a clean worktree.
 
 ## Install From Source
 
 ```bash
-python3.11 -m pip install .
+python3 -m pip install .
 repo-task --version
 ```
 
 For development:
 
 ```bash
-python3.11 -m venv .venv
+python3 -m venv .venv
 . .venv/bin/activate
 pip install -e '.[dev]'
 pytest
@@ -128,60 +129,36 @@ makes QA decisions automatically.
 
 ## Releases
 
-A `v*` tag automatically builds, smoke-tests, and publishes:
+A `v*` tag automatically builds, smoke-tests, and publishes one cross-platform artifact:
 
 ```text
-repo-task-v<version>-macos-arm64.tar.gz
+repo-task-v<version>.tar.gz
 ```
 
-The macOS artifact is built on GitHub's `macos-14` arm64 runner. It is self-contained and does not
-require Python on the user's machine. It is ad-hoc signed, but not Developer ID signed or notarized.
+It contains the portable `repo-task` zipapp. The same file runs on Linux, macOS, and Windows; the
+only requirement is Python 3.9 or newer on the user's machine.
 
-### Build Linux Or Windows With GitHub Actions
+### Build Locally
 
-Linux and Windows builds do not run automatically:
-
-1. Open the repository's **Actions** tab.
-2. Select **Build Native Binary**.
-3. Choose **Run workflow**.
-4. Select `linux-x64`, `windows-x64`, or `all`.
-5. Download the generated workflow artifact.
-
-The manually generated artifacts are retained by GitHub Actions for 14 days:
-
-```text
-repo-task-linux-x64.tar.gz
-repo-task-windows-x64.zip
-```
-
-Extract the selected binary into the target project's `.repo-task-bin/` directory and add that
-directory to `.git/info/exclude` as shown above.
-
-### Build Locally On A Target Platform
-
-PyInstaller must run on the same operating system as the binary it produces:
+The build is pure standard library and works on any platform:
 
 ```bash
-python3.11 -m venv .build-venv
-. .build-venv/bin/activate
-python -m pip install -e '.[dev]'
-pyinstaller --clean --noconfirm repotask.spec
+python3 scripts/build_portable.py
 ```
 
-On Linux and macOS, the result is `dist/repo-task`. On Windows, it is
-`dist\repo-task.exe`. Run the smoke test before distributing it:
+The result is `dist/repo-task`. Run the smoke test before distributing it:
 
 ```bash
-python scripts/binary_smoke.py dist/repo-task
+python3 scripts/binary_smoke.py dist/repo-task
 ```
 
-On Windows:
+On Windows the file is invoked through `python`:
 
 ```powershell
-python scripts/binary_smoke.py dist\repo-task.exe
+python scripts\binary_smoke.py dist\repo-task
 ```
 
-There is no self-update mechanism. Replace the project-local binary when changing versions.
+There is no self-update mechanism. Replace the project-local file when changing versions.
 
 ## License
 
