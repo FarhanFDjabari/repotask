@@ -6,20 +6,17 @@ import hashlib
 import json
 import shutil
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import yaml
-from prompt_toolkit import prompt
-from rich.console import Console
-from rich.table import Table
-
+from repotask.config.simple_yaml import load_yaml
 from repotask.config.writer import dump_yaml
 from repotask.discovery.assets import normalized_agent_role, validate_import
 from repotask.discovery.project import ProjectDiscovery, discover_project
 from repotask.errors import RepoTaskError
 from repotask.resources import read_bundled
+from repotask.terminal import color, print_table, prompt_text
 
 STANDARD_ROLES = [
     "requirement-analyst",
@@ -74,8 +71,8 @@ def _load_answers(path: Path | None) -> dict[str, Any]:
     if not path.exists():
         raise RepoTaskError(f"Answers file not found: {path}")
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError as error:
+        data = load_yaml(path.read_text(encoding="utf-8"))
+    except ValueError as error:
         raise RepoTaskError(f"Could not parse answers file {path}: {error}") from error
     if not isinstance(data, dict):
         raise RepoTaskError(f"Answers file {path} must contain a YAML mapping.")
@@ -100,46 +97,46 @@ def _paths(discovery: ProjectDiscovery, category: str) -> list[str]:
 
 
 def _interactive_answers(discovery: ProjectDiscovery, seed: dict[str, Any]) -> dict[str, Any]:
-    Console().print("[bold]RepoTask setup[/bold] (press Enter to accept each recommendation)")
-    project_name = prompt(
-        "Project name: ", default=str(_answer(seed, "project.name", discovery.project_name))
+    print(f"{color('RepoTask setup', 'bold')} (press Enter to accept each recommendation)")
+    project_name = prompt_text(
+        "Project name", str(_answer(seed, "project.name", discovery.project_name))
     )
     stacks_default = ",".join(_answer(seed, "project.stacks", discovery.stacks))
-    stacks = _csv(prompt("Stacks (comma separated): ", default=stacks_default))
-    base_branch = prompt(
-        "Base branch: ", default=str(_answer(seed, "project.base_branch", discovery.base_branch))
+    stacks = _csv(prompt_text("Stacks (comma separated)", stacks_default))
+    base_branch = prompt_text(
+        "Base branch", str(_answer(seed, "project.base_branch", discovery.base_branch))
     )
-    branch_pattern = prompt(
-        "Feature branch pattern: ",
-        default=str(_answer(seed, "branch.feature_pattern", "feature/{task_id}-{slug}")),
+    branch_pattern = prompt_text(
+        "Feature branch pattern",
+        str(_answer(seed, "branch.feature_pattern", "feature/{task_id}-{slug}")),
     )
-    vcs_provider = prompt(
-        "VCS provider [gitlab/github/bitbucket/other]: ",
-        default=str(_answer(seed, "vcs.provider", discovery.vcs_provider)),
+    vcs_provider = prompt_text(
+        "VCS provider [gitlab/github/bitbucket/other]",
+        str(_answer(seed, "vcs.provider", discovery.vcs_provider)),
     ).strip().lower()
-    task_provider = prompt(
+    task_provider = prompt_text(
         "Task provider [manual/clickup/jira/linear/github-issues/gitlab-issues/"
-        "azure-devops/custom]: ",
-        default=str(_answer(seed, "task_provider.provider", "manual")),
+        "azure-devops/custom]",
+        str(_answer(seed, "task_provider.provider", "manual")),
     ).strip().lower()
     display_name, url_pattern, connector_hint = PROVIDER_DEFAULTS.get(
         task_provider, PROVIDER_DEFAULTS["custom"]
     )
-    display_name = prompt(
-        "Task provider display name: ",
-        default=str(_answer(seed, "task_provider.display_name", display_name)),
+    display_name = prompt_text(
+        "Task provider display name",
+        str(_answer(seed, "task_provider.display_name", display_name)),
     )
-    url_pattern = prompt(
-        "Task URL pattern (optional, use {task_id}): ",
-        default=str(_answer(seed, "task_provider.url_pattern", url_pattern)),
+    url_pattern = prompt_text(
+        "Task URL pattern (optional, use {task_id})",
+        str(_answer(seed, "task_provider.url_pattern", url_pattern)),
     )
-    connector_hint = prompt(
-        "Read-only connector hint (optional): ",
-        default=str(_answer(seed, "task_provider.connector_hint", connector_hint)),
+    connector_hint = prompt_text(
+        "Read-only connector hint (optional)",
+        str(_answer(seed, "task_provider.connector_hint", connector_hint)),
     )
-    workflow_mode = prompt(
-        "Workflow [imported/bundled/combined/none]: ",
-        default=str(
+    workflow_mode = prompt_text(
+        "Workflow [imported/bundled/combined/none]",
+        str(
             _answer(
                 seed,
                 "workflow.mode",
@@ -148,14 +145,14 @@ def _interactive_answers(discovery: ProjectDiscovery, seed: dict[str, Any]) -> d
         ),
     ).strip().lower()
     workflow_assets = _csv_paths(
-        prompt(
-            "Workflow files (comma separated): ",
-            default=",".join(_answer(seed, "assets.workflow", _paths(discovery, "workflow"))),
-        )
+        prompt_text(
+            "Workflow files (comma separated)",
+            ",".join(_answer(seed, "assets.workflow", _paths(discovery, "workflow"))),
+        ),
     )
-    template = prompt(
-        "CR template (optional): ",
-        default=str(
+    template = prompt_text(
+        "CR template (optional)",
+        str(
             _answer(
                 seed,
                 "assets.template",
@@ -164,20 +161,20 @@ def _interactive_answers(discovery: ProjectDiscovery, seed: dict[str, Any]) -> d
         ),
     ).strip()
     rules = _csv_paths(
-        prompt(
-            "Rules/instruction files (comma separated): ",
-            default=",".join(_answer(seed, "assets.rules", _paths(discovery, "rules"))),
-        )
+        prompt_text(
+            "Rules/instruction files (comma separated)",
+            ",".join(_answer(seed, "assets.rules", _paths(discovery, "rules"))),
+        ),
     )
     agents = _csv_paths(
-        prompt(
-            "Agent files (comma separated): ",
-            default=",".join(_answer(seed, "assets.agents", _paths(discovery, "agents"))),
-        )
+        prompt_text(
+            "Agent files (comma separated)",
+            ",".join(_answer(seed, "assets.agents", _paths(discovery, "agents"))),
+        ),
     )
-    bundled_defaults = prompt(
-        "Supplement missing assets with bundled defaults? [Y/n]: ",
-        default="y" if _answer(seed, "bundled_defaults", True) else "n",
+    bundled_defaults = prompt_text(
+        "Supplement missing assets with bundled defaults? [Y/n]",
+        "y" if _answer(seed, "bundled_defaults", True) else "n",
     ).strip().lower() not in {"n", "no"}
     return {
         "project": {"name": project_name, "stacks": stacks, "base_branch": base_branch},
@@ -426,7 +423,7 @@ def _conditional_agents(stacks: list[str]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for stack in stacks:
         try:
-            profile = yaml.safe_load(read_bundled("profiles", f"{stack}.yml")) or {}
+            profile = load_yaml(read_bundled("profiles", f"{stack}.yml")) or {}
         except FileNotFoundError:
             continue
         result.update(profile.get("conditional_agents", {}))
@@ -444,11 +441,7 @@ def _deduplicate_writes(writes: list[PlannedWrite]) -> list[PlannedWrite]:
 
 
 def _preview(writes: list[PlannedWrite], root: Path) -> None:
-    table = Table(title=f"Planned RepoTask writes in {root}")
-    table.add_column("Action")
-    table.add_column("Destination")
-    table.add_column("Source")
-    table.add_column("Category")
+    rows = []
     for write in sorted(writes, key=lambda item: item.destination):
         path = root / write.destination
         action = (
@@ -456,8 +449,12 @@ def _preview(writes: list[PlannedWrite], root: Path) -> None:
             if path.exists() and path.read_text(encoding="utf-8") == write.content
             else ("replace" if path.exists() else "create")
         )
-        table.add_row(action, write.destination, write.source, write.category)
-    Console().print(table)
+        rows.append((action, write.destination, write.source, write.category))
+    print_table(
+        f"Planned RepoTask writes in {root}",
+        ("Action", "Destination", "Source", "Category"),
+        rows,
+    )
 
 
 def _read_manifest(root: Path) -> dict[str, Any]:
@@ -490,7 +487,7 @@ def _backup_owned(root: Path, writes: list[PlannedWrite], manifest: dict[str, An
     ]
     if not replacements:
         return None
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     backup_root = root / ".repo-task/backups" / stamp
     for write in replacements:
         source = root / write.destination
@@ -569,17 +566,17 @@ def initialize(
     writes = _build_plan(discovery, answers)
     _preview(writes, discovery.root)
     if dry_run:
-        Console().print("[yellow]Dry run: no files were written.[/yellow]")
+        print(f"{color('Dry run:', 'yellow')} no files were written.")
         return
     if not non_interactive and not assume_yes:
-        confirmed = prompt("Apply this plan? [y/N]: ", default="n").strip().lower()
+        confirmed = prompt_text("Apply this plan? [y/N]", "n").strip().lower()
         if confirmed not in {"y", "yes"}:
-            Console().print("Initialization cancelled.")
+            print("Initialization cancelled.")
             return
     changed, backup = _apply(discovery.root, writes, force)
-    Console().print(f"[green]RepoTask initialized.[/green] {changed} file(s) changed.")
+    print(f"{color('RepoTask initialized.', 'green')} {changed} file(s) changed.")
     if backup:
-        Console().print(f"Backup created at {backup}")
-    Console().print(
+        print(f"Backup created at {backup}")
+    print(
         "Configuration and imported assets are ready to commit; RepoTask did not create a commit."
     )

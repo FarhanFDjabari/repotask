@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
-from yaml.error import MarkedYAMLError
-
 from repotask.config.models import RepoTaskConfig
+from repotask.config.simple_yaml import load_yaml
 from repotask.errors import RepoTaskError
 from repotask.git import resolve_git_root
 
@@ -20,14 +18,11 @@ def load_config(start: Path | None = None) -> RepoTaskConfig:
     if not path.exists():
         raise RepoTaskError(f"{CONFIG_NAME} not found at Git root {root}. Run repo-task init.")
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except MarkedYAMLError as error:
-        mark = getattr(error, "problem_mark", None)
-        location = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
-        raise RepoTaskError(f"Could not parse {path}{location}: {error.problem}") from error
+        raw = load_yaml(path.read_text(encoding="utf-8"))
+    except ValueError as error:
+        raise RepoTaskError(f"Could not parse {path}: {error}") from error
     except OSError as error:
         raise RepoTaskError(f"Could not read {path}: {error}") from error
     if not isinstance(raw, dict):
         raise RepoTaskError(f"{path} must contain a YAML mapping.")
     return RepoTaskConfig.from_dict(raw, root)
-

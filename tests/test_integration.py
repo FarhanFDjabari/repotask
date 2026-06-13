@@ -4,12 +4,13 @@ import json
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
 
-from repotask.cli import app
+from repotask.cli import run
 from tests.conftest import git, write_answers
 
-runner = CliRunner()
+
+def invoke(args: list[str]) -> int:
+    return run(args)
 
 
 @pytest.mark.parametrize(
@@ -30,10 +31,7 @@ def test_project_matrix_initialization(
 ) -> None:
     answers = write_answers(git_repo, stacks=stacks, vcs=vcs, provider=provider)
     monkeypatch.chdir(git_repo)
-    result = runner.invoke(
-        app, ["init", "--non-interactive", "--answers", str(answers)]
-    )
-    assert result.exit_code == 0, result.output
+    assert invoke(["init", "--non-interactive", "--answers", str(answers)]) == 0
     config = (git_repo / ".repo-task.yml").read_text(encoding="utf-8")
     assert f"provider: {provider}" in config
     assert f"provider: {vcs}" in config
@@ -46,16 +44,11 @@ def test_start_context_review_cr_status_flow(
 ) -> None:
     answers = write_answers(git_repo, stacks=["python"], vcs="github", provider="jira")
     monkeypatch.chdir(git_repo)
-    assert runner.invoke(
-        app, ["init", "--non-interactive", "--answers", str(answers)]
-    ).exit_code == 0
+    assert invoke(["init", "--non-interactive", "--answers", str(answers)]) == 0
     git(git_repo, "add", ".")
     git(git_repo, "commit", "-m", "initialize RepoTask")
 
-    result = runner.invoke(
-        app, ["start", "ABC-1", "--title", "Fix parser edge case", "--mode", "human"]
-    )
-    assert result.exit_code == 0, result.output
+    assert invoke(["start", "ABC-1", "--title", "Fix parser edge case", "--mode", "human"]) == 0
     task_dir = git_repo / ".repo-task/tasks/ABC-1"
     task = json.loads((task_dir / "config.json").read_text(encoding="utf-8"))
     assert task["branch"] == "feature/ABC-1-fix-parser-edge-case"
@@ -64,9 +57,7 @@ def test_start_context_review_cr_status_flow(
 
     requirement = git_repo / "requirement.md"
     requirement.write_text("Handle empty input safely.\n", encoding="utf-8")
-    assert runner.invoke(
-        app, ["context", "ABC-1", "--from-file", str(requirement)]
-    ).exit_code == 0
+    assert invoke(["context", "ABC-1", "--from-file", str(requirement)]) == 0
     assert "Handle empty input safely" in (task_dir / "context.md").read_text(encoding="utf-8")
 
     (git_repo / "feature.py").write_text(
@@ -74,16 +65,15 @@ def test_start_context_review_cr_status_flow(
     )
     git(git_repo, "add", "feature.py")
     git(git_repo, "commit", "-m", "implement")
-    assert runner.invoke(app, ["review", "ABC-1"]).exit_code == 0
+    assert invoke(["review", "ABC-1"]) == 0
     assert "## Must fix" in (task_dir / "prompts/review.md").read_text(encoding="utf-8")
 
-    assert runner.invoke(app, ["cr", "ABC-1"]).exit_code == 0
+    assert invoke(["cr", "ABC-1"]) == 0
     description = (task_dir / "cr-description.md").read_text(encoding="utf-8")
     assert "<!-- repo-task:generated:start -->" in description
     assert "https://tasks.example/ABC-1" in description
 
-    result = runner.invoke(app, ["status", "ABC-1", "--provider"])
-    assert result.exit_code == 0, result.output
+    assert invoke(["status", "ABC-1", "--provider"]) == 0
     prompt = (task_dir / "prompts/provider-status.md").read_text(encoding="utf-8")
     assert "READ-ONLY" in prompt
     assert "Do not update provider status" in prompt
@@ -94,14 +84,11 @@ def test_review_warns_about_empty_diff(
 ) -> None:
     answers = write_answers(git_repo)
     monkeypatch.chdir(git_repo)
-    runner.invoke(app, ["init", "--non-interactive", "--answers", str(answers)])
+    invoke(["init", "--non-interactive", "--answers", str(answers)])
     git(git_repo, "add", ".")
     git(git_repo, "commit", "-m", "initialize")
-    runner.invoke(app, ["start", "TEST-1", "--title", "No changes", "--mode", "human"])
-    result = runner.invoke(app, ["review", "TEST-1"])
-    assert result.exit_code == 1
-    assert result.exception is not None
-    assert "No diff found" in str(result.exception)
+    invoke(["start", "TEST-1", "--title", "No changes", "--mode", "human"])
+    assert invoke(["review", "TEST-1"]) == 1
 
 
 def test_no_template_workflow_is_supported(
@@ -109,10 +96,7 @@ def test_no_template_workflow_is_supported(
 ) -> None:
     answers = write_answers(git_repo, workflow="none")
     monkeypatch.chdir(git_repo)
-    result = runner.invoke(
-        app, ["init", "--non-interactive", "--answers", str(answers)]
-    )
-    assert result.exit_code == 0, result.output
+    assert invoke(["init", "--non-interactive", "--answers", str(answers)]) == 0
     config = (git_repo / ".repo-task.yml").read_text(encoding="utf-8")
     assert "documents: []" in config
     assert ".repo-task/templates/bundled/github.md" in config

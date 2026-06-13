@@ -4,7 +4,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
-import yaml
+
+from repotask.config.writer import dump_yaml
 
 
 def git(root: Path, *args: str) -> str:
@@ -60,5 +61,5 @@ def write_answers(
         "bundled_defaults": True,
     }
     path = root / "answers.yml"
-    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    path.write_text(dump_yaml(data), encoding="utf-8")
     return path

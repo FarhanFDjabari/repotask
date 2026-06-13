@@ -1,17 +1,22 @@
-"""Cross-platform smoke test for a frozen RepoTask executable."""
+"""Cross-platform smoke test for a RepoTask executable artifact."""
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-import yaml
-
 
 def run(args: list[str], root: Path) -> None:
     subprocess.run(args, cwd=root, check=True)
+
+
+def command(executable: Path, *args: str) -> list[str]:
+    if os.name == "nt":
+        return [sys.executable, str(executable), *args]
+    return [str(executable), *args]
 
 
 def main() -> int:
@@ -26,27 +31,50 @@ def main() -> int:
         (root / "README.md").write_text("# Smoke\n", encoding="utf-8")
         run(["git", "add", "README.md"], root)
         run(["git", "commit", "-m", "initial"], root)
-        answers = {
-            "project": {"name": "smoke", "stacks": ["generic"], "base_branch": "main"},
-            "vcs": {"provider": "other"},
-            "task_provider": {"provider": "manual", "display_name": "Task"},
-            "workflow": {"mode": "bundled"},
-            "assets": {"workflow": [], "template": "", "rules": [], "agents": []},
-            "bundled_defaults": True,
-        }
         answer_path = root / "answers.yml"
-        answer_path.write_text(yaml.safe_dump(answers, sort_keys=False), encoding="utf-8")
-        command = str(executable)
-        run([command, "--version"], root)
+        answer_path.write_text(
+            """project:
+  name: smoke
+  stacks:
+  - generic
+  base_branch: main
+vcs:
+  provider: other
+task_provider:
+  provider: manual
+  display_name: Task
+workflow:
+  mode: bundled
+assets:
+  workflow: []
+  template: ""
+  rules: []
+  agents: []
+bundled_defaults: true
+""",
+            encoding="utf-8",
+        )
+        run(command(executable, "--version"), root)
+        run(command(executable, "--show-completion", "bash"), root)
         run(
-            [command, "init", "--dry-run", "--non-interactive", "--answers", str(answer_path)],
+            command(
+                executable,
+                "init",
+                "--dry-run",
+                "--non-interactive",
+                "--answers",
+                str(answer_path),
+            ),
             root,
         )
-        run([command, "init", "--non-interactive", "--answers", str(answer_path)], root)
-        run([command, "doctor"], root)
+        run(command(executable, "init", "--non-interactive", "--answers", str(answer_path)), root)
+        run(command(executable, "doctor"), root)
         run(["git", "add", "."], root)
         run(["git", "commit", "-m", "setup"], root)
-        run([command, "start", "TEST-1", "--title", "Smoke test", "--mode", "human"], root)
+        run(
+            command(executable, "start", "TEST-1", "--title", "Smoke test", "--mode", "human"),
+            root,
+        )
     return 0
 
 

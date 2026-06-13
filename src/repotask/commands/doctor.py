@@ -4,33 +4,29 @@ from __future__ import annotations
 
 import shutil
 
-from rich.console import Console
-from rich.table import Table
-
 from repotask.config.loader import load_config
 from repotask.errors import RepoTaskError
 from repotask.git import resolve_git_root
+from repotask.terminal import print_table
 
 
 def run_doctor() -> bool:
-    table = Table(title="RepoTask doctor")
-    table.add_column("Check")
-    table.add_column("Result")
+    rows = []
     ok = True
     try:
         root = resolve_git_root()
-        table.add_row("Git repository", f"ok: {root}")
+        rows.append(("Git repository", f"ok: {root}"))
     except RepoTaskError as error:
-        table.add_row("Git repository", f"failed: {error}")
-        Console().print(table)
+        rows.append(("Git repository", f"failed: {error}"))
+        print_table("RepoTask doctor", ("Check", "Result"), rows)
         return False
     for executable in ("git",):
         found = shutil.which(executable)
         ok = ok and bool(found)
-        table.add_row(executable, f"ok: {found}" if found else "missing")
+        rows.append((executable, f"ok: {found}" if found else "missing"))
     try:
         config = load_config(root)
-        table.add_row("Configuration", f"ok: schema {config.schema_version}")
+        rows.append(("Configuration", f"ok: schema {config.schema_version}"))
         for relative in (
             config.rules.files
             + config.workflow.documents
@@ -39,16 +35,15 @@ def run_doctor() -> bool:
         ):
             exists = (root / relative).is_file()
             ok = ok and exists
-            table.add_row(relative, "ok" if exists else "missing")
+            rows.append((relative, "ok" if exists else "missing"))
         if config.vcs.create_enabled:
             executable = config.vcs.adapter
             found = shutil.which(executable)
-            table.add_row(f"CR adapter ({executable})", "ok" if found else "missing")
+            rows.append((f"CR adapter ({executable})", "ok" if found else "missing"))
     except RepoTaskError as error:
         ok = False
-        table.add_row("Configuration", f"failed: {error}")
+        rows.append(("Configuration", f"failed: {error}"))
     manifest = root / ".repo-task/setup-manifest.json"
-    table.add_row("Setup manifest", "ok" if manifest.is_file() else "missing")
-    Console().print(table)
+    rows.append(("Setup manifest", "ok" if manifest.is_file() else "missing"))
+    print_table("RepoTask doctor", ("Check", "Result"), rows)
     return ok
-

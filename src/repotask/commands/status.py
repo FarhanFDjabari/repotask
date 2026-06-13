@@ -5,14 +5,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from rich.console import Console
-from rich.table import Table
-
 from repotask.config.loader import load_config
 from repotask.files import read_json, read_optional, write_text
 from repotask.git import current_branch, safe_git_output, untracked_files
 from repotask.prompts.service import load_prompt_inputs, provider_status_prompt
 from repotask.tasks import read_task_config, task_directory
+from repotask.terminal import print_table
 
 
 def task_status(task_id: str, provider: bool) -> Path | None:
@@ -53,12 +51,7 @@ def task_status(task_id: str, provider: bool) -> Path | None:
         ),
         ("Untracked files", str(len(untracked_files(config.root)))),
     ]
-    table = Table(title=f"RepoTask status: {task_id}")
-    table.add_column("Signal")
-    table.add_column("Value")
-    for row in rows:
-        table.add_row(*row)
-    Console().print(table)
+    print_table(f"RepoTask status: {task_id}", ("Signal", "Value"), rows)
     if not provider:
         return None
     path = task_dir / "prompts/provider-status.md"
@@ -84,4 +77,3 @@ def _description_state(context: str | None) -> str:
     if not text:
         return "empty"
     return "placeholder" if "TODO: Add task requirement" in text else "filled"
-

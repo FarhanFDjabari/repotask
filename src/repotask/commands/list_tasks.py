@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from rich.console import Console
-from rich.table import Table
-
 from repotask.config.loader import load_config
 from repotask.files import read_json
 from repotask.git import current_branch
+from repotask.terminal import print_table
 
 
 def list_tasks() -> int:
@@ -30,14 +28,7 @@ def list_tasks() -> int:
             )
         )
     if not rows:
-        Console().print("No tasks found. Run repo-task start first.")
+        print("No tasks found. Run repo-task start first.")
         return 0
-    table = Table(title="RepoTask tasks")
-    table.add_column("")
-    table.add_column("Task")
-    table.add_column("Title")
-    table.add_column("Branch")
-    for row in rows:
-        table.add_row(*row)
-    Console().print(table)
+    print_table("RepoTask tasks", ("", "Task", "Title", "Branch"), rows)
     return len(rows)
