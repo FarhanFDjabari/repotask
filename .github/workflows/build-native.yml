@@ -1,0 +1,60 @@
+name: Build Native Binary
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform artifact to build
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - linux-x64
+          - windows-x64
+
+jobs:
+  linux-x64:
+    if: inputs.platform == 'all' || inputs.platform == 'linux-x64'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build native binary
+        run: |
+          python -m pip install -e ".[dev]"
+          pyinstaller --clean --noconfirm repotask.spec
+      - name: Smoke test
+        run: python scripts/binary_smoke.py dist/repo-task
+      - name: Package artifact
+        run: tar -czf repo-task-linux-x64.tar.gz -C dist repo-task
+      - uses: actions/upload-artifact@v4
+        with:
+          name: repo-task-linux-x64
+          path: repo-task-linux-x64.tar.gz
+          retention-days: 14
+
+  windows-x64:
+    if: inputs.platform == 'all' || inputs.platform == 'windows-x64'
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build native binary
+        run: |
+          python -m pip install -e ".[dev]"
+          pyinstaller --clean --noconfirm repotask.spec
+      - name: Smoke test
+        run: python scripts/binary_smoke.py dist/repo-task.exe
+      - name: Package artifact
+        shell: pwsh
+        run: Compress-Archive -Path dist/repo-task.exe -DestinationPath repo-task-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: repo-task-windows-x64
+          path: repo-task-windows-x64.zip
+          retention-days: 14

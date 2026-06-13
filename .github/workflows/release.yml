@@ -1,4 +1,4 @@
-name: Release
+name: Release macOS Binary
 
 on:
   push:
@@ -8,37 +8,28 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  release-macos-arm64:
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Build universal wheel
+      - name: Build native binary
         run: |
-          python -m pip install build
-          python -m build --wheel
-      - name: Verify universal wheel
+          python -m pip install -e ".[dev]"
+          pyinstaller --clean --noconfirm repotask.spec
+      - name: Smoke test
+        run: python scripts/binary_smoke.py dist/repo-task
+      - name: Package artifact
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          wheels = list(Path("dist").glob("*.whl"))
-          assert len(wheels) == 1, f"Expected one wheel, found: {wheels}"
-          assert wheels[0].name.endswith("-py3-none-any.whl"), wheels[0].name
-          print(wheels[0])
-          PY
-      - name: Smoke install wheel
-        run: |
-          python -m venv wheel-smoke
-          wheel-smoke/bin/python -m pip install dist/*.whl
-          wheel-smoke/bin/repo-task --version
-          wheel-smoke/bin/repo-task --help
-      - name: Publish repository release
+          codesign --force --deep --sign - dist/repo-task
+          codesign --verify --verbose dist/repo-task
+          tar -czf "repo-task-${GITHUB_REF_NAME}-macos-arm64.tar.gz" -C dist repo-task
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: dist/*.whl
+          files: repo-task-${{ github.ref_name }}-macos-arm64.tar.gz
