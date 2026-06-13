@@ -23,14 +23,14 @@ def test_bundled_resources_support_single_argument_joinpath(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    bundled = tmp_path / "bundled"
-    resource = bundled / "rules" / "common.md"
+    package_root = tmp_path
+    resource = package_root / "bundled" / "rules" / "common.md"
     resource.parent.mkdir(parents=True)
     resource.write_text("common rules\n", encoding="utf-8")
     monkeypatch.setattr(
         resources,
         "files",
-        lambda package: SingleArgumentTraversable(bundled),
+        lambda package: SingleArgumentTraversable(package_root),
     )
 
     assert resources.bundled_path("rules", "common.md") == resource

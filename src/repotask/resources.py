@@ -12,7 +12,12 @@ except ModuleNotFoundError:  # Python 3.9-3.10
 
 
 def _bundled_resource(*parts: str) -> Traversable:
-    resource = files("repotask.bundled")
+    # Anchor at the top-level package and treat "bundled" as a path part. On Windows with
+    # Python 3.9/3.10 zipapps, resolving the "repotask.bundled" subpackage leaks OS path
+    # separators ("repotask\\bundled") into the archive lookup; the single top-level anchor
+    # keeps the path forward-slashed. joinpath is called one part at a time so Traversables
+    # that only accept a single child argument keep working.
+    resource = files("repotask").joinpath("bundled")
     for part in parts:
         resource = resource.joinpath(part)
     return resource
