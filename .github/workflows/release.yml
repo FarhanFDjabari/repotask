@@ -30,3 +30,4 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+          files: "repo-task-${GITHUB_REF_NAME}.tar.gz"
