@@ -29,8 +29,10 @@ def change_request(task_id: str, create: bool, draft: bool) -> list[str]:
         )
     base = str(inputs.task_config.get("baseBranch") or config.project.base_branch)
     description_path = task_dir / "cr-description.md"
+    raw_title = str(inputs.task_config.get("title", ""))
+    sanitized_title = raw_title.replace("\n", " ").strip()
     title = config.change_request.title_pattern.format(
-        task_id=task_id, title=str(inputs.task_config.get("title", ""))
+        task_id=task_id, title=sanitized_title
     )
     if create:
         if draft and not create:

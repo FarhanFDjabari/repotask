@@ -47,6 +47,8 @@ def assert_clean_worktree(root: Path) -> None:
 
 
 def verify_branch(root: Path, branch: str) -> None:
+    if branch.startswith("-"):
+        raise RepoTaskError(f"Invalid branch name: {branch}")
     try:
         run_git(["rev-parse", "--verify", branch], root)
     except RepoTaskError as error:
@@ -56,7 +58,7 @@ def verify_branch(root: Path, branch: str) -> None:
 def create_branch(root: Path, branch: str, base_branch: str) -> None:
     verify_branch(root, base_branch)
     try:
-        run_git(["switch", "-c", branch, base_branch], root)
+        run_git(["switch", "-c", branch, "--", base_branch], root)
     except RepoTaskError as error:
         raise RepoTaskError(
             f"Could not create branch {branch} from {base_branch}: {error}"
@@ -64,7 +66,7 @@ def create_branch(root: Path, branch: str, base_branch: str) -> None:
 
 
 def diff(root: Path, base_branch: str, include_worktree: bool = False) -> str:
-    committed = run_git(["diff", f"{base_branch}...HEAD"], root)
+    committed = run_git(["diff", f"{base_branch}...HEAD", "--"], root)
     if not include_worktree:
         return committed
     sections = [
@@ -78,9 +80,9 @@ def diff(root: Path, base_branch: str, include_worktree: bool = False) -> str:
 
 
 def changed_paths(root: Path, base_branch: str, include_worktree: bool = False) -> list[str]:
-    commands = [["diff", "--name-only", f"{base_branch}...HEAD"]]
+    commands = [["diff", "--name-only", f"{base_branch}...HEAD", "--"]]
     if include_worktree:
-        commands.extend([["diff", "--cached", "--name-only"], ["diff", "--name-only"]])
+        commands.extend([["diff", "--cached", "--name-only", "--"], ["diff", "--name-only", "--"]])
     paths: set[str] = set()
     for command in commands:
         paths.update(line.strip() for line in run_git(command, root).splitlines() if line.strip())
@@ -90,8 +92,8 @@ def changed_paths(root: Path, base_branch: str, include_worktree: bool = False) 
 def diff_summary(root: Path, base_branch: str) -> str:
     sections = []
     for label, args in [
-        ("Name status", ["diff", "--name-status", f"{base_branch}...HEAD"]),
-        ("Stat", ["diff", "--stat", f"{base_branch}...HEAD"]),
+        ("Name status", ["diff", "--name-status", f"{base_branch}...HEAD", "--"]),
+        ("Stat", ["diff", "--stat", f"{base_branch}...HEAD", "--"]),
     ]:
         try:
             output = run_git(args, root)
