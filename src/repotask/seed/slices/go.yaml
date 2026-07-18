@@ -1,0 +1,18 @@
+stack: go
+extends:
+- generic
+conventions:
+- go-conventions
+recipes:
+- naming
+facts: []
+intents:
+  feature:
+  - go-conventions
+  - naming
+  bugfix:
+  - go-conventions
+  review:
+  - go-conventions
+  summarize:
+  - go-conventions

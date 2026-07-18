@@ -1,4 +1,4 @@
-name: Release Portable Script
+name: Release
 
 on:
   push:
@@ -8,26 +8,23 @@ permissions:
   contents: write
 
 jobs:
-  release-portable:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - name: Build portable script
+          python-version: "3.12"
+      - name: Build distributions
         run: |
-          python -m pip install -e ".[dev]"
-          python scripts/build_portable.py
-      - name: Smoke test
-        run: python scripts/binary_smoke.py dist/repo-task
-      - name: Package artifact
-        run: |
-          tar -czf "repo-task-${GITHUB_REF_NAME}.tar.gz" -C dist repo-task
+          python -m pip install build
+          python -m build
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: "repo-task-${GITHUB_REF_NAME}.tar.gz"
+          files: |
+            dist/*.whl
+            dist/*.tar.gz

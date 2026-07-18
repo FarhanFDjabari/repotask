@@ -1,0 +1,18 @@
+stack: generic
+conventions:
+- common-conventions
+- generic-conventions
+recipes: []
+facts: []
+intents:
+  feature:
+  - common-conventions
+  - generic-conventions
+  bugfix:
+  - common-conventions
+  - generic-conventions
+  review:
+  - common-conventions
+  - generic-conventions
+  summarize:
+  - common-conventions

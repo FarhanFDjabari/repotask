@@ -1,0 +1,21 @@
+stack: kotlin
+extends:
+- generic
+conventions:
+- kotlin-conventions
+recipes:
+- naming
+facts:
+- viewmodels
+- repositories
+- usecases
+intents:
+  feature:
+  - kotlin-conventions
+  - naming
+  bugfix:
+  - kotlin-conventions
+  review:
+  - kotlin-conventions
+  summarize:
+  - kotlin-conventions

@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.2.0 - Unreleased
+
+Rebuilt around a knowledge base the agent queries, replacing prompt-file generation.
+This is a breaking change; run `repo-task migrate` to upgrade a 0.1 project.
+
+### Added
+
+- Three-layer knowledge base (conventions, project facts, recipes) sourced from a remote
+  git repository or an in-project directory, with per-stack slices and token budgeting.
+- `brief` — one ranked, budgeted context pack for a task; the command agents call first.
+- `index`, `symbol`, `fact` — tree-sitter code indexing into curated fact families
+  declared by the knowledge base (Kotlin, Swift, Dart, TypeScript, Python, Go, Rust, Java).
+- `kb init|sync|status|propose` — scaffold, pin, inspect, and propose facts back by PR.
+- Feature flow: `fetch`, `summarize`, `analyze`, `split`.
+- Bugfix flow: `bug fetch`, `bug dedupe` (clusters tickets that resolve to the same code).
+- Connectors for Jira, GitHub, GitLab, and ClickUp in `mcp` mode (the agent makes the call)
+  or `rest` mode (the CLI does), with credentials outside the project.
+- `skills sync` — generates Claude Code skills and an AGENTS.md block that reference
+  commands only, so they never carry stale project knowledge.
+- A stable `--json` envelope on every command.
+
+### Changed
+
+- Configuration moved to `.repo-task/config.yaml` at schema version 2, validated with pydantic.
+- The CLI now installs globally (`uv tool install` / `pipx install`) rather than per project;
+  Python 3.10+ is required and third-party dependencies are used again.
+
+### Removed
+
+- The `start`, `context`, `investigate`, `review`, `cr`, `status`, and `list` commands, along
+  with the prompt, agent-assignment, rules, and template services they used.
+- The portable zipapp build and its release artifact.
+
 ## 0.1.1 - Unreleased
 
 - Replaced the PyInstaller native binary with a portable single-file zipapp built by

@@ -1,0 +1,19 @@
+stack: dart
+extends:
+- generic
+conventions:
+- dart-conventions
+recipes:
+- naming
+facts:
+- repositories
+intents:
+  feature:
+  - dart-conventions
+  - naming
+  bugfix:
+  - dart-conventions
+  review:
+  - dart-conventions
+  summarize:
+  - dart-conventions

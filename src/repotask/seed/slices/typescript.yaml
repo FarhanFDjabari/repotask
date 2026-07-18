@@ -1,0 +1,20 @@
+stack: typescript
+extends:
+- generic
+conventions:
+- typescript-conventions
+recipes:
+- naming
+facts:
+- components
+- repositories
+intents:
+  feature:
+  - typescript-conventions
+  - naming
+  bugfix:
+  - typescript-conventions
+  review:
+  - typescript-conventions
+  summarize:
+  - typescript-conventions

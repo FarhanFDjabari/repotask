@@ -1,0 +1,30 @@
+stack: ios
+extends:
+- generic
+conventions:
+- ios-conventions
+- swift-conventions
+recipes:
+- add-a-screen
+- implement-pagination
+- naming
+facts:
+- viewmodels
+- repositories
+- screens
+- usecases
+intents:
+  feature:
+  - ios-conventions
+  - swift-conventions
+  - add-a-screen
+  - implement-pagination
+  - naming
+  bugfix:
+  - ios-conventions
+  - swift-conventions
+  review:
+  - ios-conventions
+  - swift-conventions
+  summarize:
+  - ios-conventions

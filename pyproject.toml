@@ -48,7 +48,6 @@ packages = ["src/repotask"]
 include = [
   "/src",
   "/tests",
-  "/scripts",
   "/.github",
   "/.gitlab-ci.yml",
   "/README.md",

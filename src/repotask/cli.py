@@ -15,6 +15,7 @@ from repotask.commands import facts as fact_commands
 from repotask.commands import kb as kb_commands
 from repotask.commands import query as query_commands
 from repotask.commands import setup as setup_commands
+from repotask.commands import skills as skills_commands
 from repotask.commands import work as work_commands
 from repotask.output import state
 
@@ -26,6 +27,7 @@ app = typer.Typer(
 )
 app.add_typer(kb_commands.app, name="kb", help="Manage the knowledge base source.")
 app.add_typer(bug_commands.app, name="bug", help="Bugfix workflow.")
+app.add_typer(skills_commands.app, name="skills", help="Generate agent skill files.")
 
 for command in (
     setup_commands.init,

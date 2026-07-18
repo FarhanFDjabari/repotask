@@ -88,6 +88,12 @@ def load_document(path: Path, layer: Layer, kb_root: Path) -> Document:
     front, body = parse_frontmatter(path.read_text(encoding="utf-8"))
     front.setdefault("id", path.stem)
     front.setdefault("title", path.stem.replace("-", " ").title())
+    # The directory decides the layer. Frontmatter may restate it, but not contradict it.
+    declared = front.pop("layer", layer)
+    if declared != layer:
+        raise RepoTaskError(
+            f"{path} declares layer '{declared}' but sits in the {layer} directory."
+        )
     try:
         return Document(
             **front, layer=layer, body=body, path=str(path.relative_to(kb_root))

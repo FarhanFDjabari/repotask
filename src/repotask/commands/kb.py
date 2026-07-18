@@ -67,6 +67,44 @@ def _render(data: dict[str, Any]) -> RenderableType:
     return table
 
 
+@app.command("init")
+@guard
+def kb_init(
+    path: str = typer.Option(
+        "", "--path", help="Where to scaffold. Defaults to the configured local directory."
+    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing seed files."),
+) -> None:
+    """Scaffold a starter knowledge base: conventions, recipes, slices, and kb.yaml.
+
+    The seed is a starting point, not an answer — replace the conventions with the
+    decisions this project has actually made.
+    """
+    from repotask.kb.seed import scaffold
+
+    config = load_config()
+    target = (config.root / (path or config.knowledge.local)).resolve()
+    written = scaffold(target, config.project.stacks, force=force)
+    data = {
+        "path": str(target),
+        "stacks": config.project.stacks,
+        "written": written,
+        "nextSteps": [
+            f"Edit the conventions in {target.name}/conventions/ to match this project",
+            "repo-task index",
+            "repo-task skills sync",
+        ],
+    }
+    emit(
+        "kb.init",
+        data,
+        lambda payload: (
+            f"Scaffolded {len(payload['written'])} files into {payload['path']}\n"
+            + "\n".join(f"  - {step}" for step in payload["nextSteps"])
+        ),
+    )
+
+
 @app.command()
 @guard
 def sync() -> None:

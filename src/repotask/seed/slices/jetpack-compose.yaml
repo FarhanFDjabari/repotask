@@ -1,0 +1,19 @@
+stack: jetpack-compose
+extends:
+- android
+conventions:
+- jetpack-compose-conventions
+recipes:
+- add-a-screen
+facts:
+- screens
+intents:
+  feature:
+  - jetpack-compose-conventions
+  - add-a-screen
+  bugfix:
+  - jetpack-compose-conventions
+  review:
+  - jetpack-compose-conventions
+  summarize:
+  - jetpack-compose-conventions

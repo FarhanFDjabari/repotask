@@ -1,0 +1,21 @@
+stack: swift
+extends:
+- generic
+conventions:
+- swift-conventions
+recipes:
+- naming
+facts:
+- viewmodels
+- repositories
+- usecases
+intents:
+  feature:
+  - swift-conventions
+  - naming
+  bugfix:
+  - swift-conventions
+  review:
+  - swift-conventions
+  summarize:
+  - swift-conventions

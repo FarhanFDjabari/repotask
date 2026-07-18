@@ -1,0 +1,24 @@
+stack: web
+extends:
+- generic
+conventions:
+- web-conventions
+recipes:
+- add-a-screen
+- implement-pagination
+- naming
+facts:
+- components
+- screens
+intents:
+  feature:
+  - web-conventions
+  - add-a-screen
+  - implement-pagination
+  - naming
+  bugfix:
+  - web-conventions
+  review:
+  - web-conventions
+  summarize:
+  - web-conventions
