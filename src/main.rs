@@ -1,12 +1,17 @@
-//! RepoTask command line entry point (Rust spike: index, brief, symbol).
+//! RepoTask command line entry point.
+//!
+//! Every command is agent-first: `--json` returns a stable envelope (see `output`),
+//! and the CLI never calls a language model. It locates, parses, budgets, and returns.
 
 mod commands;
 mod config;
+mod discovery;
 mod git;
 mod index;
 mod kb;
 mod output;
 
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -26,11 +31,81 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Create `.repo-task/config.yaml` from repository discovery.
+    Init {
+        /// Knowledge base git URL. Omit to use an in-project directory.
+        #[arg(long, default_value = "")]
+        remote: String,
+        /// In-project knowledge base directory.
+        #[arg(long, default_value = ".repo-task/knowledge")]
+        local: String,
+        /// Override detected stacks. Repeatable.
+        #[arg(long = "stack")]
+        stacks: Vec<String>,
+        /// Overwrite an existing configuration.
+        #[arg(long)]
+        force: bool,
+        /// Preview without writing.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Check configuration, knowledge base reachability, and tooling.
+    Doctor,
+    /// Upgrade a schema version 1 `.repo-task.yml` to `.repo-task/config.yaml`.
+    Migrate {
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Read architecture and stack conventions for this project.
+    Convention {
+        /// Convention id or search topic.
+        topic: String,
+        #[arg(long, default_value_t = 3)]
+        limit: usize,
+    },
+    /// Read the project playbook for a specific task.
+    Recipe {
+        /// Recipe id or the task you want a playbook for.
+        task: String,
+        #[arg(long, default_value_t = 3)]
+        limit: usize,
+    },
+    /// Search conventions and recipes; returns ids to read with `convention` or `recipe`.
+    Search {
+        /// Keywords to search across the knowledge base.
+        query: String,
+        /// Restrict to `convention` or `recipe`.
+        #[arg(long, default_value = "")]
+        layer: String,
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
     /// Scan the project and write fact families into the knowledge base.
     Index {
         /// Index only files changed against the base branch.
         #[arg(long)]
         changed_only: bool,
+    },
+    /// Search indexed declarations by name.
+    Symbol {
+        /// Substring or regular expression to match.
+        query: String,
+        /// Restrict to one declaration kind.
+        #[arg(long)]
+        kind: Option<String>,
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+    },
+    /// Read a curated project fact family produced by `index`.
+    Fact {
+        /// Fact family name. Omit to list available families.
+        #[arg(default_value = "")]
+        family: String,
+        /// Filter entries by name substring.
+        #[arg(long, default_value = "")]
+        query: String,
+        #[arg(long, default_value_t = 100)]
+        limit: usize,
     },
     /// Assemble the conventions, recipes, and project facts that apply to this work.
     Brief {
@@ -46,37 +121,117 @@ enum Command {
         #[arg(long)]
         budget: Option<usize>,
     },
-    /// Search indexed declarations by name.
-    Symbol {
-        /// Substring or regular expression to match.
-        query: String,
-        /// Restrict to one declaration kind.
-        #[arg(long)]
-        kind: Option<String>,
-        #[arg(long, default_value_t = 50)]
-        limit: usize,
+    /// Manage the knowledge base source.
+    Kb {
+        #[command(subcommand)]
+        command: KbCommand,
     },
+}
+
+#[derive(Subcommand)]
+enum KbCommand {
+    /// Scaffold a starter knowledge base: conventions, recipes, slices, and kb.yaml.
+    Init {
+        /// Where to scaffold. Defaults to the configured local directory.
+        #[arg(long, default_value = "")]
+        path: String,
+        #[arg(long)]
+        force: bool,
+    },
+    /// Clone or fetch the knowledge base and pin it to the configured ref.
+    Sync,
+    /// Show the resolved knowledge base without touching the network.
+    Status,
+    /// Stage generated facts in the knowledge base worktree and print PR instructions.
+    Propose {
+        #[arg(long, short, default_value = "chore: refresh project facts")]
+        message: String,
+        /// Branch name; defaults to a timestamped one.
+        #[arg(long, default_value = "")]
+        branch: String,
+    },
+}
+
+/// Returns the command name for the envelope and whether the run succeeded.
+fn dispatch(command: &Command) -> (&'static str, Result<bool>) {
+    match command {
+        Command::Init {
+            remote,
+            local,
+            stacks,
+            force,
+            dry_run,
+        } => (
+            "init",
+            commands::setup::init(remote, local, stacks, *force, *dry_run).map(|_| true),
+        ),
+        Command::Doctor => ("doctor", commands::setup::doctor()),
+        Command::Migrate { dry_run } => {
+            ("migrate", commands::setup::migrate(*dry_run).map(|_| true))
+        }
+        Command::Convention { topic, limit } => (
+            "convention",
+            commands::query::convention(topic, *limit).map(|_| true),
+        ),
+        Command::Recipe { task, limit } => (
+            "recipe",
+            commands::query::recipe(task, *limit).map(|_| true),
+        ),
+        Command::Search {
+            query,
+            layer,
+            limit,
+        } => (
+            "search",
+            commands::query::search(query, layer, *limit).map(|_| true),
+        ),
+        Command::Index { changed_only } => {
+            ("index", commands::facts::index(*changed_only).map(|_| true))
+        }
+        Command::Symbol { query, kind, limit } => (
+            "symbol",
+            commands::facts::symbol(query, kind.as_deref(), *limit).map(|_| true),
+        ),
+        Command::Fact {
+            family,
+            query,
+            limit,
+        } => (
+            "fact",
+            commands::facts::fact(family, query, *limit).map(|_| true),
+        ),
+        Command::Brief {
+            intent,
+            paths,
+            changed,
+            budget,
+        } => (
+            "brief",
+            commands::facts::brief(intent, paths, *changed, *budget).map(|_| true),
+        ),
+        Command::Kb { command } => match command {
+            KbCommand::Init { path, force } => {
+                ("kb.init", commands::kb::init(path, *force).map(|_| true))
+            }
+            KbCommand::Sync => ("kb.sync", commands::kb::sync().map(|_| true)),
+            KbCommand::Status => ("kb.status", commands::kb::status().map(|_| true)),
+            KbCommand::Propose { message, branch } => (
+                "kb.propose",
+                commands::kb::propose(message, branch).map(|_| true),
+            ),
+        },
+    }
 }
 
 fn main() -> std::process::ExitCode {
     let cli = Cli::parse();
     output::set_json_mode(cli.json);
 
-    let (name, result) = match &cli.command {
-        Command::Index { changed_only } => ("index", commands::index(*changed_only)),
-        Command::Brief {
-            intent,
-            paths,
-            changed,
-            budget,
-        } => ("brief", commands::brief(intent, paths, *changed, *budget)),
-        Command::Symbol { query, kind, limit } => {
-            ("symbol", commands::symbol(query, kind.as_deref(), *limit))
-        }
-    };
-
+    let (name, result) = dispatch(&cli.command);
     match result {
-        Ok(()) => std::process::ExitCode::SUCCESS,
+        Ok(true) => std::process::ExitCode::SUCCESS,
+        // `doctor` reports its findings through the envelope and still fails the run.
+        Ok(false) => std::process::ExitCode::FAILURE,
         Err(error) => {
             // anyhow chains read outermost-first; join them into one line so the
             // JSON envelope carries the full context.

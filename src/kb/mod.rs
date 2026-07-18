@@ -2,6 +2,7 @@
 
 pub mod budget;
 pub mod schema;
+pub mod seed;
 pub mod slicing;
 pub mod source;
 pub mod store;

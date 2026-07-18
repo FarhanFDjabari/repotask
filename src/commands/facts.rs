@@ -149,6 +149,96 @@ pub fn symbol(query: &str, kind: Option<&str>, limit: usize) -> Result<()> {
     Ok(())
 }
 
+/// Read a curated project fact family produced by `index`.
+pub fn fact(family: &str, query: &str, limit: usize) -> Result<()> {
+    let config = config::load()?;
+    let kb = kb::open(&config, Some(false))?;
+    let available = kb.fact_families();
+
+    if family.is_empty() {
+        let data = json!({
+            "families": kb.manifest.fact_families.iter().map(|item| json!({
+                "name": item.name,
+                "description": item.description,
+                "indexed": available.contains(&item.name),
+            })).collect::<Vec<_>>(),
+            "available": available,
+        });
+        output::emit("fact", &data, |value| {
+            let mut lines = vec!["Fact families".to_string()];
+            if let Some(families) = value["families"].as_array() {
+                for item in families {
+                    lines.push(format!(
+                        "  {:<16} {:<4} {}",
+                        item["name"].as_str().unwrap_or(""),
+                        if item["indexed"].as_bool().unwrap_or(false) {
+                            "yes"
+                        } else {
+                            "no"
+                        },
+                        item["description"].as_str().unwrap_or(""),
+                    ));
+                }
+            }
+            lines.join("\n")
+        });
+        return Ok(());
+    }
+
+    if !available.iter().any(|name| name == family) {
+        bail!(
+            "Fact family '{family}' has not been indexed. Available: {}. Run `repo-task index`.",
+            if available.is_empty() {
+                "none".to_string()
+            } else {
+                available.join(", ")
+            }
+        );
+    }
+    let mut entries = kb.facts(family);
+    if !query.is_empty() {
+        let lowered = query.to_lowercase();
+        entries.retain(|entry| {
+            entry["name"]
+                .as_str()
+                .unwrap_or_default()
+                .to_lowercase()
+                .contains(&lowered)
+        });
+    }
+    let count = entries.len();
+    entries.truncate(limit);
+
+    let data = json!({"family": family, "count": count, "entries": entries});
+    output::emit("fact", &data, |value| {
+        let Some(entries) = value["entries"].as_array() else {
+            return String::new();
+        };
+        if entries.is_empty() {
+            return format!(
+                "No entries in '{}'.",
+                value["family"].as_str().unwrap_or("")
+            );
+        }
+        let mut lines = vec![format!(
+            "{} ({})",
+            value["family"].as_str().unwrap_or(""),
+            value["count"]
+        )];
+        for entry in entries {
+            lines.push(format!(
+                "  {:<28} {:<10} {}:{}",
+                entry["name"].as_str().unwrap_or(""),
+                entry["kind"].as_str().unwrap_or(""),
+                entry["path"].as_str().unwrap_or(""),
+                entry["line"],
+            ));
+        }
+        lines.join("\n")
+    });
+    Ok(())
+}
+
 fn render_brief(value: &Value) -> String {
     let mut lines = vec![
         format!("Context pack: {}", value["intent"].as_str().unwrap_or("")),
