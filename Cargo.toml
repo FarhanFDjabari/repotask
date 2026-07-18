@@ -1,0 +1,50 @@
+[package]
+name = "repo-task"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.82"
+description = "Agent-orchestrated knowledge and workflow CLI for software projects"
+license = "Apache-2.0"
+
+[[bin]]
+name = "repo-task"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+globset = "0.4"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_norway = "0.9"
+thiserror = "2"
+walkdir = "2"
+
+tree-sitter = "0.25"
+tree-sitter-dart = { version = "0.0.4", optional = true }
+tree-sitter-go = { version = "0.23", optional = true }
+tree-sitter-java = { version = "0.23", optional = true }
+tree-sitter-javascript = { version = "0.23", optional = true }
+tree-sitter-kotlin-ng = { version = "1", optional = true }
+tree-sitter-python = { version = "0.23", optional = true }
+tree-sitter-rust = { version = "0.23", optional = true }
+tree-sitter-swift = { version = "0.7", optional = true }
+tree-sitter-typescript = { version = "0.23", optional = true }
+include_dir = "0.7"
+ureq = "3"
+
+[features]
+default = ["all-grammars"]
+all-grammars = ["mobile", "web", "backend"]
+mobile = ["dep:tree-sitter-kotlin-ng", "dep:tree-sitter-swift", "dep:tree-sitter-dart", "dep:tree-sitter-java"]
+web = ["dep:tree-sitter-typescript", "dep:tree-sitter-javascript"]
+backend = ["dep:tree-sitter-python", "dep:tree-sitter-go", "dep:tree-sitter-rust"]
+
+# Size matters: this ships as a downloaded binary, not a package install.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
