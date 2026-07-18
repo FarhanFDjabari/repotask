@@ -1,2 +1,1 @@
-"""CLI command implementations."""
-
+"""CLI command groups."""
