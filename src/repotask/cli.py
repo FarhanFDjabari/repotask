@@ -9,6 +9,8 @@ from __future__ import annotations
 import typer
 
 from repotask import __version__
+from repotask.commands import brief as brief_commands
+from repotask.commands import facts as fact_commands
 from repotask.commands import kb as kb_commands
 from repotask.commands import query as query_commands
 from repotask.commands import setup as setup_commands
@@ -29,6 +31,10 @@ for command in (
     query_commands.convention,
     query_commands.recipe,
     query_commands.search,
+    fact_commands.index,
+    fact_commands.symbol,
+    fact_commands.fact,
+    brief_commands.brief,
 ):
     app.command()(command)
 
