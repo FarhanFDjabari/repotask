@@ -1,11 +1,16 @@
 stages: [test]
 
 default:
-  image: python:3.11
+  image: rust:latest
 
 test:
   stage: test
+  before_script:
+    # The test suite creates real git repositories as knowledge-base fixtures.
+    - git config --global user.email "ci@example.com"
+    - git config --global user.name "RepoTask CI"
+    - rustup component add rustfmt clippy
   script:
-    - pip install -e ".[dev]"
-    - ruff check .
-    - pytest
+    - cargo fmt --check
+    - cargo clippy --all-targets -- -D warnings
+    - cargo test

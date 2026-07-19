@@ -1,0 +1,28 @@
+stack: react-native
+extends:
+- generic
+conventions:
+- react-native-conventions
+- typescript-conventions
+recipes:
+- add-a-screen
+- implement-pagination
+- naming
+facts:
+- components
+- screens
+intents:
+  feature:
+  - react-native-conventions
+  - typescript-conventions
+  - add-a-screen
+  - implement-pagination
+  - naming
+  bugfix:
+  - react-native-conventions
+  - typescript-conventions
+  review:
+  - react-native-conventions
+  - typescript-conventions
+  summarize:
+  - react-native-conventions

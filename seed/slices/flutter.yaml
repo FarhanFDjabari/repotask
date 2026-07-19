@@ -1,0 +1,29 @@
+stack: flutter
+extends:
+- generic
+conventions:
+- flutter-conventions
+- dart-conventions
+recipes:
+- add-a-screen
+- implement-pagination
+- naming
+facts:
+- repositories
+- screens
+- usecases
+intents:
+  feature:
+  - flutter-conventions
+  - dart-conventions
+  - add-a-screen
+  - implement-pagination
+  - naming
+  bugfix:
+  - flutter-conventions
+  - dart-conventions
+  review:
+  - flutter-conventions
+  - dart-conventions
+  summarize:
+  - flutter-conventions

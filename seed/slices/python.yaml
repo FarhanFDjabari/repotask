@@ -1,0 +1,18 @@
+stack: python
+extends:
+- generic
+conventions:
+- python-conventions
+recipes:
+- naming
+facts: []
+intents:
+  feature:
+  - python-conventions
+  - naming
+  bugfix:
+  - python-conventions
+  review:
+  - python-conventions
+  summarize:
+  - python-conventions

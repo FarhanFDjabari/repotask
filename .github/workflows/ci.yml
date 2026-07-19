@@ -4,33 +4,37 @@ on:
   push:
   pull_request:
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          python-version: ${{ matrix.python }}
-      - run: python -m pip install -e ".[dev]"
-      - run: ruff check .
-      - run: pytest
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      # The test suite creates real git repositories as knowledge-base fixtures.
+      - run: git config --global user.email "ci@example.com"
+      - run: git config --global user.name "RepoTask CI"
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
 
-  portable-smoke:
-    if: github.event_name == 'pull_request'
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  grammar-subsets:
+    # The default build carries every grammar; make sure the trimmed builds a
+    # size-constrained user might pick still compile.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-      - run: python -m pip install -e ".[dev]"
-      - run: python scripts/build_portable.py
-      - run: python scripts/binary_smoke.py dist/repo-task
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --no-default-features
+      - run: cargo check --no-default-features --features mobile
+      - run: cargo check --no-default-features --features web,backend

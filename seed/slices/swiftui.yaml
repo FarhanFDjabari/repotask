@@ -1,0 +1,19 @@
+stack: swiftui
+extends:
+- ios
+conventions:
+- swiftui-conventions
+recipes:
+- add-a-screen
+facts:
+- screens
+intents:
+  feature:
+  - swiftui-conventions
+  - add-a-screen
+  bugfix:
+  - swiftui-conventions
+  review:
+  - swiftui-conventions
+  summarize:
+  - swiftui-conventions

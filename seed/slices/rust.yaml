@@ -1,0 +1,18 @@
+stack: rust
+extends:
+- generic
+conventions:
+- rust-conventions
+recipes:
+- naming
+facts: []
+intents:
+  feature:
+  - rust-conventions
+  - naming
+  bugfix:
+  - rust-conventions
+  review:
+  - rust-conventions
+  summarize:
+  - rust-conventions

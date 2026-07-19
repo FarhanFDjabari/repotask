@@ -1,0 +1,30 @@
+stack: android
+extends:
+- generic
+conventions:
+- android-conventions
+- kotlin-conventions
+recipes:
+- add-a-screen
+- implement-pagination
+- naming
+facts:
+- viewmodels
+- repositories
+- screens
+- usecases
+intents:
+  feature:
+  - android-conventions
+  - kotlin-conventions
+  - add-a-screen
+  - implement-pagination
+  - naming
+  bugfix:
+  - android-conventions
+  - kotlin-conventions
+  review:
+  - android-conventions
+  - kotlin-conventions
+  summarize:
+  - android-conventions
