@@ -34,11 +34,22 @@ install -m 755 repo-task /usr/local/bin/
 repo-task --version
 ```
 
+On macOS the downloaded archive carries a quarantine flag, and the release binary is not yet
+notarized — so the first run reports that Apple could not verify it. That is Gatekeeper declining to
+check an unsigned binary, not a malware detection. Verify the archive against the checksum on the
+releases page, then clear the flag:
+
+```bash
+xattr -d com.apple.quarantine /usr/local/bin/repo-task
+```
+
 Or build from source with a Rust toolchain:
 
 ```bash
 cargo install --path .
 ```
+
+Locally built binaries are never quarantined, so this path avoids the Gatekeeper prompt entirely.
 
 Install once per machine. Each project keeps only a small config file and generated agent skills.
 
