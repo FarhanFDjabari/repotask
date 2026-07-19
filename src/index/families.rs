@@ -14,6 +14,7 @@ use crate::index::runner::{IndexResult, Symbol};
 use crate::kb::schema::FactFamily;
 
 pub const SYMBOLS_FAMILY: &str = "symbols";
+pub const SYMBOLS_DESCRIPTION: &str = "Every indexed declaration (searchable with `symbol`)";
 
 fn matches(family: &FactFamily, symbol: &Symbol, pattern: Option<&Regex>) -> bool {
     if !family.languages.is_empty() && !family.languages.contains(&symbol.language) {

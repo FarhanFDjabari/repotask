@@ -18,7 +18,7 @@ use crate::workflow::analyze::{impact_set, split_increments, Impact};
 use crate::workflow::store;
 
 const SUMMARY_CONTRACT: &str =
-    "Condense the source below into the context this project actually needs.
+    "Condense the source above into the context this project actually needs.
 Keep only what affects these stacks: {stacks}. Drop platform notes, market copy, and
 requirements that belong to other clients. Preserve every acceptance criterion that
 survives that filter. Write the result back with:
@@ -170,7 +170,32 @@ pub fn summarize(ticket: &str, write: &str, budget: Option<usize>) -> Result<()>
         "nextStep": format!("repo-task summarize {ticket} --write -"),
     });
     output::emit("summarize", &data, |value| {
-        value["contract"].as_str().unwrap_or("").to_string()
+        let mut lines = vec![
+            format!(
+                "Summarize {}  (stacks: {})",
+                value["ticket"].as_str().unwrap_or(""),
+                value["stacks"]
+                    .as_array()
+                    .map(|items| items
+                        .iter()
+                        .filter_map(|item| item.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "))
+                    .unwrap_or_default(),
+            ),
+            String::new(),
+            "Source".to_string(),
+            value["source"]
+                .as_str()
+                .unwrap_or("")
+                .trim_end()
+                .to_string(),
+            String::new(),
+        ];
+        lines.push(super::render_pack(&value["context"]));
+        lines.push(String::new());
+        lines.push(value["contract"].as_str().unwrap_or("").to_string());
+        lines.join("\n")
     });
     Ok(())
 }

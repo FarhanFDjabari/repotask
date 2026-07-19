@@ -76,7 +76,24 @@ pub fn bug_fetch(ticket: &str, system: &str, write: &str, budget: Option<usize>)
     )?;
     item.touch_meta(&[("kind", json!("bug")), ("analyzed", json!(true))])?;
     output::emit("bug.fetch", &data, |value| {
-        value["contract"].as_str().unwrap_or("").to_string()
+        let mut lines = vec![
+            format!("Bug {}", value["ticket"].as_str().unwrap_or("")),
+            String::new(),
+            "Report".to_string(),
+            value["report"]
+                .as_str()
+                .unwrap_or("")
+                .trim_end()
+                .to_string(),
+            String::new(),
+            "Impact".to_string(),
+        ];
+        lines.extend(super::render_impact(&value["impact"]));
+        lines.push(String::new());
+        lines.push(super::render_pack(&value["context"]));
+        lines.push(String::new());
+        lines.push(value["contract"].as_str().unwrap_or("").to_string());
+        lines.join("\n")
     });
     Ok(())
 }
