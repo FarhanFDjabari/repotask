@@ -10,6 +10,7 @@ mod git;
 mod index;
 mod kb;
 mod output;
+mod skills;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -126,6 +127,20 @@ enum Command {
         #[command(subcommand)]
         command: KbCommand,
     },
+    /// Generate agent skill files.
+    Skills {
+        #[command(subcommand)]
+        command: SkillsCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum SkillsCommand {
+    /// Write Claude Code skills and the AGENTS.md block for this project.
+    Sync {
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -218,6 +233,12 @@ fn dispatch(command: &Command) -> (&'static str, Result<bool>) {
             KbCommand::Propose { message, branch } => (
                 "kb.propose",
                 commands::kb::propose(message, branch).map(|_| true),
+            ),
+        },
+        Command::Skills { command } => match command {
+            SkillsCommand::Sync { dry_run } => (
+                "skills.sync",
+                commands::skills::sync(*dry_run).map(|_| true),
             ),
         },
     }
