@@ -47,10 +47,12 @@ fn config_document(
 
 fn next_steps(has_remote: bool) -> Vec<String> {
     let mut steps: Vec<String> = Vec::new();
-    if !has_remote {
+    // A local knowledge base is scaffolded in place; only a remote one needs cloning.
+    if has_remote {
+        steps.push("repo-task kb sync".into());
+    } else {
         steps.push("repo-task kb init".into());
     }
-    steps.push("repo-task kb sync".into());
     steps.push("repo-task index".into());
     steps.push("repo-task skills sync".into());
     steps
