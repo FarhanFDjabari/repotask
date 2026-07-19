@@ -194,3 +194,20 @@ fn design_map_requires_an_index() {
         .unwrap()
         .contains("repo-task index"));
 }
+
+#[test]
+fn a_system_with_a_dedicated_command_points_at_it() {
+    let fixture = Fixture::new("connect-figma");
+    with_connector(
+        &fixture,
+        "  figma:\n    mode: auto\n    project: \"filekey\"\n",
+    );
+
+    let envelope = fixture.json(&["connect", "figma", "file"]);
+
+    assert_eq!(envelope["ok"], false);
+    assert!(envelope["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("repo-task design"));
+}

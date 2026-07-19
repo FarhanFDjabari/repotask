@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 use serde_json::json;
 
 use crate::config;
-use crate::connectors::{connector_config, declared, fallback, mcp_json};
+use crate::connectors::{connector_config, declared, fallback, mcp_json, OTHER_SYSTEMS};
 use crate::output;
 
 pub fn connect(system: &str, verb_name: &str, args: &[String]) -> Result<()> {
@@ -48,6 +48,11 @@ pub fn connect(system: &str, verb_name: &str, args: &[String]) -> Result<()> {
     }
 
     let Some(verb) = settings.verbs.get(verb_name) else {
+        // A system with a dedicated command should point there rather than reporting
+        // an empty verb list, which reads as "not supported".
+        if OTHER_SYSTEMS.contains(&system) && settings.verbs.is_empty() {
+            bail!("'{system}' has a dedicated command: use `repo-task design`.");
+        }
         let mut available: Vec<&str> = settings.verbs.keys().map(String::as_str).collect();
         available.sort();
         bail!(
