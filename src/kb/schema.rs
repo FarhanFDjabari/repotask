@@ -66,12 +66,6 @@ fn default_kb_budget() -> usize {
     6000
 }
 
-impl Manifest {
-    pub fn family(&self, name: &str) -> Option<&FactFamily> {
-        self.fact_families.iter().find(|family| family.name == name)
-    }
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Slice {

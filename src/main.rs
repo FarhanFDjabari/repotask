@@ -5,15 +5,19 @@
 
 mod commands;
 mod config;
+mod connectors;
 mod discovery;
 mod git;
 mod index;
 mod kb;
 mod output;
 mod skills;
+mod workflow;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+
+use workflow::dedupe::MIN_SIMILARITY;
 
 #[derive(Parser)]
 #[command(
@@ -122,6 +126,42 @@ enum Command {
         #[arg(long)]
         budget: Option<usize>,
     },
+    /// Pull a ticket or PRD into the local work directory.
+    Fetch {
+        ticket: String,
+        /// Connector name. Defaults to the only one.
+        #[arg(long, default_value = "")]
+        system: String,
+        /// Store this content as the source ('-' reads stdin).
+        #[arg(long, default_value = "")]
+        write: String,
+    },
+    /// Return the source plus the project's own context, filtered to this project's stacks.
+    Summarize {
+        ticket: String,
+        /// Store this content as the summary ('-' reads stdin).
+        #[arg(long, default_value = "")]
+        write: String,
+        #[arg(long)]
+        budget: Option<usize>,
+    },
+    /// Compute the impact set from the indexed project facts.
+    Analyze {
+        ticket: String,
+        #[arg(long, default_value_t = 40)]
+        limit: usize,
+    },
+    /// Group the impact set into incremental, independently reviewable steps.
+    Split {
+        ticket: String,
+        #[arg(long, default_value_t = 8)]
+        max_files: usize,
+    },
+    /// Bugfix workflow.
+    Bug {
+        #[command(subcommand)]
+        command: BugCommand,
+    },
     /// Manage the knowledge base source.
     Kb {
         #[command(subcommand)]
@@ -131,6 +171,36 @@ enum Command {
     Skills {
         #[command(subcommand)]
         command: SkillsCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum BugCommand {
+    /// Fetch a bug report together with the code and conventions it implicates.
+    Fetch {
+        ticket: String,
+        #[arg(long, default_value = "")]
+        system: String,
+        #[arg(long, default_value = "")]
+        write: String,
+        #[arg(long)]
+        budget: Option<usize>,
+    },
+    /// Group open bug tickets that resolve to the same code.
+    Dedupe {
+        #[arg(long, default_value = "")]
+        system: String,
+        /// Provider query selecting the tickets.
+        #[arg(long, default_value = "")]
+        query: String,
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+        /// Minimum similarity to group two tickets.
+        #[arg(long, default_value_t = MIN_SIMILARITY)]
+        threshold: f64,
+        /// Read tickets as JSON instead of calling a connector ('-' is stdin).
+        #[arg(long = "tickets", default_value = "")]
+        tickets_file: String,
     },
 }
 
@@ -224,6 +294,52 @@ fn dispatch(command: &Command) -> (&'static str, Result<bool>) {
             "brief",
             commands::facts::brief(intent, paths, *changed, *budget).map(|_| true),
         ),
+        Command::Fetch {
+            ticket,
+            system,
+            write,
+        } => (
+            "fetch",
+            commands::work::fetch(ticket, system, write).map(|_| true),
+        ),
+        Command::Summarize {
+            ticket,
+            write,
+            budget,
+        } => (
+            "summarize",
+            commands::work::summarize(ticket, write, *budget).map(|_| true),
+        ),
+        Command::Analyze { ticket, limit } => (
+            "analyze",
+            commands::work::analyze(ticket, *limit).map(|_| true),
+        ),
+        Command::Split { ticket, max_files } => (
+            "split",
+            commands::work::split(ticket, *max_files).map(|_| true),
+        ),
+        Command::Bug { command } => match command {
+            BugCommand::Fetch {
+                ticket,
+                system,
+                write,
+                budget,
+            } => (
+                "bug.fetch",
+                commands::bug::bug_fetch(ticket, system, write, *budget).map(|_| true),
+            ),
+            BugCommand::Dedupe {
+                system,
+                query,
+                limit,
+                threshold,
+                tickets_file,
+            } => (
+                "bug.dedupe",
+                commands::bug::bug_dedupe(system, query, *limit, *threshold, tickets_file)
+                    .map(|_| true),
+            ),
+        },
         Command::Kb { command } => match command {
             KbCommand::Init { path, force } => {
                 ("kb.init", commands::kb::init(path, *force).map(|_| true))

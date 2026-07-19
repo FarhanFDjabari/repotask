@@ -1,7 +1,7 @@
 //! `repo-task skills` — generate the agent-facing entry points.
 
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::json;
 
 use crate::config;
 use crate::output;

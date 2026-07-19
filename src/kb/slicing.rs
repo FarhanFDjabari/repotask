@@ -62,11 +62,11 @@ pub fn rank(
         let mut score = 0;
         let mut reasons: Vec<String> = Vec::new();
 
-        if intent_ids.iter().any(|id| id == &document.id) {
+        if intent_ids.contains(&document.id) {
             score += WEIGHT_INTENT_SLICE;
             reasons.push(format!("slice:{intent}"));
         }
-        if slice_ids.iter().any(|id| id == &document.id) {
+        if slice_ids.contains(&document.id) {
             score += WEIGHT_SLICE;
             reasons.push("slice".into());
         }
@@ -80,7 +80,7 @@ pub fn rank(
             .tags
             .iter()
             .map(|tag| tag.to_lowercase())
-            .filter(|tag| words.iter().any(|word| *word == tag))
+            .filter(|tag| words.contains(&tag))
             .collect();
         tag_hits.sort();
         tag_hits.dedup();
@@ -92,7 +92,7 @@ pub fn rank(
         let title_words = split_words(&format!("{} {}", document.id, document.title));
         if title_words
             .iter()
-            .any(|word| word.len() > 2 && words.iter().any(|item| *item == word))
+            .any(|word| word.len() > 2 && words.contains(&word))
         {
             score += WEIGHT_TITLE;
             reasons.push("title".into());
