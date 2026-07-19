@@ -80,6 +80,20 @@ pub fn write(root: &Path, relative: &str, content: &str) -> PathBuf {
     path
 }
 
+/// A `file://` URL git accepts on every platform.
+///
+/// A Windows path inside a double-quoted YAML scalar is not a path at all: the
+/// backslashes are escape sequences, so `"file://C:\Users\..."` fails to parse.
+pub fn file_url(path: &Path) -> String {
+    let text = path.display().to_string().replace('\\', "/");
+    // Windows absolute paths start with a drive letter and need the extra root slash.
+    if text.starts_with('/') {
+        format!("file://{text}")
+    } else {
+        format!("file:///{text}")
+    }
+}
+
 /// A temporary directory that cleans itself up, without pulling in a crate for it.
 pub struct TempDir {
     pub path: PathBuf,
@@ -171,10 +185,10 @@ project:
   stacks: [android, kotlin]
   base_branch: main
 knowledge:
-  remote: "file://{}"
+  remote: "{}"
   ref: main
 "#,
-                kb.display()
+                file_url(&kb)
             ),
         );
         commit_all(&project, "initial");

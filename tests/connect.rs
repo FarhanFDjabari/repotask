@@ -35,11 +35,14 @@ fn an_unknown_verb_names_the_declared_ones() {
 
     let envelope = fixture.json(&["connect", "acme", "nope"]);
 
-    assert_eq!(envelope["ok"], false);
-    assert!(envelope["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("task"));
+    assert_eq!(envelope["ok"], false, "{envelope}");
+    assert!(
+        envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("task"),
+        "{envelope}"
+    );
 }
 
 #[test]
@@ -78,6 +81,13 @@ fn rest_mode_surfaces_the_failure_rather_than_falling_back() {
         envelope["ok"], false,
         "an explicit rest mode must not silently fall back"
     );
+    assert!(
+        envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("failed"),
+        "the transport failure itself must surface: {envelope}"
+    );
 }
 
 #[test]
@@ -91,11 +101,14 @@ fn a_missing_argument_is_named() {
 
     let envelope = fixture.json(&["connect", "acme", "task"]);
 
-    assert_eq!(envelope["ok"], false);
-    assert!(envelope["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("--arg id"));
+    assert_eq!(envelope["ok"], false, "{envelope}");
+    assert!(
+        envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("--arg id"),
+        "{envelope}"
+    );
 }
 
 #[test]
@@ -105,11 +118,14 @@ fn a_disabled_connector_is_refused() {
 
     let envelope = fixture.json(&["connect", "acme"]);
 
-    assert_eq!(envelope["ok"], false);
-    assert!(envelope["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("disabled"));
+    assert_eq!(envelope["ok"], false, "{envelope}");
+    assert!(
+        envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("disabled"),
+        "{envelope}"
+    );
 }
 
 #[test]
@@ -188,11 +204,14 @@ fn design_map_requires_an_index() {
 
     let envelope = fixture.json(&["design", "map", "Button/Primary"]);
 
-    assert_eq!(envelope["ok"], false);
-    assert!(envelope["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("repo-task index"));
+    assert_eq!(envelope["ok"], false, "{envelope}");
+    assert!(
+        envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("repo-task index"),
+        "{envelope}"
+    );
 }
 
 #[test]
@@ -205,9 +224,12 @@ fn a_system_with_a_dedicated_command_points_at_it() {
 
     let envelope = fixture.json(&["connect", "figma", "file"]);
 
-    assert_eq!(envelope["ok"], false);
-    assert!(envelope["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("repo-task design"));
+    assert_eq!(envelope["ok"], false, "{envelope}");
+    assert!(
+        envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("repo-task design"),
+        "{envelope}"
+    );
 }
