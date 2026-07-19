@@ -480,9 +480,8 @@ mod tests {
     fn config(project: &str) -> ConnectorConfig {
         ConnectorConfig {
             mode: "mcp".into(),
-            base_url: String::new(),
             project: project.into(),
-            mcp_server: String::new(),
+            ..Default::default()
         }
     }
 

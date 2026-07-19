@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 use crate::commands::work::{fetch, parse_tickets, read_stdin_or_file};
 use crate::config;
-use crate::connectors::{self, mcp_json};
+use crate::connectors::{self, fallback, mcp_json};
 use crate::index::families::SYMBOLS_FAMILY;
 use crate::kb;
 use crate::kb::slicing::build_pack;
@@ -106,30 +106,36 @@ pub fn bug_dedupe(
         };
         let settings = connectors::connector_config(&config, &name)?;
         let connector = connectors::get(&name)?;
-        if settings.mode == "mcp" {
-            let request = connector.mcp_list(&settings, query, limit)?;
-            let data = json!({
-                "mode": "mcp",
-                "request": mcp_json(&request),
-                "nextStep": "repo-task bug dedupe --tickets -",
-                "instruction": "Call the tool above, then pipe the tickets back as JSON: a list \
-                                of objects with id, title, and body.",
-            });
-            output::emit("bug.dedupe", &data, |value| {
-                format!(
-                    "Call {}.{}, then run: {}",
-                    value["request"]["server"].as_str().unwrap_or(""),
-                    value["request"]["tool"].as_str().unwrap_or(""),
-                    value["nextStep"].as_str().unwrap_or(""),
-                )
-            });
-            return Ok(());
+        let attempt = fallback::attempt(settings.allows_rest(), settings.allows_mcp(), || {
+            connector.list_tickets(&settings, query, limit)
+        })?;
+        match attempt {
+            fallback::Attempt::Rest(tickets) => tickets
+                .into_iter()
+                .map(|ticket| serde_json::to_value(ticket).unwrap_or_default())
+                .collect(),
+            fallback::Attempt::FallBack(reason) => {
+                let request = connector.mcp_list(&settings, query, limit)?;
+                output::warn(format!("Falling back to an MCP call: {reason}"));
+                let data = json!({
+                    "mode": "mcp",
+                    "reason": reason,
+                    "request": mcp_json(&request),
+                    "nextStep": "repo-task bug dedupe --tickets -",
+                    "instruction": "Call the tool above, then pipe the tickets back as JSON: a \
+                                    list of objects with id, title, and body.",
+                });
+                output::emit("bug.dedupe", &data, |value| {
+                    format!(
+                        "Call {}.{}, then run: {}",
+                        value["request"]["server"].as_str().unwrap_or(""),
+                        value["request"]["tool"].as_str().unwrap_or(""),
+                        value["nextStep"].as_str().unwrap_or(""),
+                    )
+                });
+                return Ok(());
+            }
         }
-        connector
-            .list_tickets(&settings, query, limit)?
-            .into_iter()
-            .map(|ticket| serde_json::to_value(ticket).unwrap_or_default())
-            .collect()
     };
 
     let impacts = build_impacts(&tickets, &symbols);

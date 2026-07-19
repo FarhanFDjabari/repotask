@@ -132,9 +132,32 @@ impl Default for BriefConfig {
     }
 }
 
+/// One externally declared REST call.
+///
+/// Declared in the project config so a system with no built-in connector — and no
+/// MCP server — is still reachable without shipping Rust for it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VerbConfig {
+    /// Path appended to the connector's `base_url`. `{name}` placeholders are filled
+    /// from `--arg name=value` and percent-encoded.
+    pub path: String,
+    #[serde(default)]
+    pub query: BTreeMap<String, String>,
+    /// Dotted paths to keep from the response, e.g. `data.items.name`. Empty keeps
+    /// everything — the point of projecting is that the agent sees the distilled
+    /// result rather than the whole payload.
+    #[serde(default)]
+    pub fields: Vec<String>,
+    /// MCP tool to fall back to when the REST call cannot be made.
+    #[serde(default)]
+    pub mcp_tool: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectorConfig {
+    /// `auto` (REST when it can, MCP hint otherwise), `rest`, `mcp`, or `off`.
     #[serde(default = "default_mode")]
     pub mode: String,
     #[serde(default)]
@@ -143,10 +166,43 @@ pub struct ConnectorConfig {
     pub project: String,
     #[serde(default)]
     pub mcp_server: String,
+    /// Header name carrying the credential, when the system is config-declared.
+    #[serde(default)]
+    pub auth_header: String,
+    /// Format for the credential value; `{token}` is substituted.
+    #[serde(default)]
+    pub auth_format: String,
+    #[serde(default)]
+    pub verbs: BTreeMap<String, VerbConfig>,
 }
 
+impl Default for ConnectorConfig {
+    fn default() -> Self {
+        Self {
+            mode: default_mode(),
+            base_url: String::new(),
+            project: String::new(),
+            mcp_server: String::new(),
+            auth_header: String::new(),
+            auth_format: String::new(),
+            verbs: BTreeMap::new(),
+        }
+    }
+}
+
+impl ConnectorConfig {
+    pub fn allows_rest(&self) -> bool {
+        self.mode == "auto" || self.mode == "rest"
+    }
+
+    pub fn allows_mcp(&self) -> bool {
+        self.mode == "auto" || self.mode == "mcp"
+    }
+}
+
+/// REST first: the CLI fetches and distils, so the agent only pays for the result.
 fn default_mode() -> String {
-    "mcp".into()
+    "auto".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

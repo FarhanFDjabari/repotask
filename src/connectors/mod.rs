@@ -8,6 +8,9 @@
 //!
 //! Which one runs is a per-system configuration choice, not a path the agent picks.
 
+pub mod declared;
+pub mod fallback;
+pub mod figma;
 pub mod providers;
 pub mod rest;
 pub mod secrets;
@@ -84,6 +87,9 @@ pub trait Connector {
 
 pub const CONNECTOR_NAMES: &[&str] = &["jira", "github", "gitlab", "clickup"];
 
+/// Systems reachable outside the ticket-shaped `Connector` trait.
+pub const OTHER_SYSTEMS: &[&str] = &["figma"];
+
 pub fn get(system: &str) -> Result<Box<dyn Connector>> {
     Ok(match system {
         "jira" => Box::new(providers::Jira),
@@ -107,15 +113,25 @@ pub fn connector_config(config: &RepoTaskConfig, system: &str) -> Result<Connect
     if settings.mode == "off" {
         bail!("Connector '{system}' is disabled.");
     }
+    if !["auto", "rest", "mcp"].contains(&settings.mode.as_str()) {
+        bail!(
+            "Connector '{system}' has mode '{}'; use auto, rest, mcp, or off.",
+            settings.mode
+        );
+    }
     Ok(settings.clone())
 }
 
 /// The single enabled connector, when the user has not named one.
 pub fn default_system(config: &RepoTaskConfig) -> Result<String> {
+    // Only ticket-shaped systems can answer `fetch`; a design or declared system
+    // being configured must not make the choice ambiguous.
     let mut enabled: Vec<&String> = config
         .connectors
         .iter()
-        .filter(|(_, settings)| settings.mode != "off")
+        .filter(|(name, settings)| {
+            settings.mode != "off" && CONNECTOR_NAMES.contains(&name.as_str())
+        })
         .map(|(name, _)| name)
         .collect();
     enabled.sort();
@@ -162,9 +178,7 @@ mod tests {
                 (*name).to_string(),
                 ConnectorConfig {
                     mode: (*mode).to_string(),
-                    base_url: String::new(),
-                    project: String::new(),
-                    mcp_server: String::new(),
+                    ..Default::default()
                 },
             );
         }

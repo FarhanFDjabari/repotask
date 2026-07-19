@@ -9,7 +9,7 @@ use anyhow::{bail, Result};
 use serde_json::{json, Value};
 
 use crate::config;
-use crate::connectors::{self, mcp_json};
+use crate::connectors::{self, fallback, mcp_json};
 use crate::index::families::SYMBOLS_FAMILY;
 use crate::kb;
 use crate::kb::slicing::build_pack;
@@ -82,29 +82,38 @@ pub fn fetch(ticket: &str, system: &str, write: &str) -> Result<()> {
     let settings = connectors::connector_config(&config, &name)?;
     let connector = connectors::get(&name)?;
 
-    if settings.mode == "mcp" {
-        let request = connector.mcp_fetch(&settings, ticket)?;
-        let data = json!({
-            "ticket": ticket,
-            "mode": "mcp",
-            "request": mcp_json(&request),
-            "nextStep": format!("repo-task fetch {ticket} --write -"),
-            "instruction": "Call the tool above yourself, then pipe the ticket text back into \
-                            the next step so later commands can use it.",
-        });
-        output::emit("fetch", &data, |value| {
-            format!(
-                "Call {}.{} with {}, then run: {}",
-                value["request"]["server"].as_str().unwrap_or(""),
-                value["request"]["tool"].as_str().unwrap_or(""),
-                value["request"]["arguments"],
-                value["nextStep"].as_str().unwrap_or(""),
-            )
-        });
-        return Ok(());
-    }
+    // REST first: the CLI fetches and stores the ticket, so the agent never pays
+    // context for the raw payload. MCP is the fallback for when the CLI cannot call.
+    let attempt = fallback::attempt(settings.allows_rest(), settings.allows_mcp(), || {
+        connector.fetch_ticket(&settings, ticket)
+    })?;
 
-    let ticket_data = connector.fetch_ticket(&settings, ticket)?;
+    let ticket_data = match attempt {
+        fallback::Attempt::Rest(ticket_data) => ticket_data,
+        fallback::Attempt::FallBack(reason) => {
+            let request = connector.mcp_fetch(&settings, ticket)?;
+            output::warn(format!("Falling back to an MCP call: {reason}"));
+            let data = json!({
+                "ticket": ticket,
+                "mode": "mcp",
+                "reason": reason,
+                "request": mcp_json(&request),
+                "nextStep": format!("repo-task fetch {ticket} --write -"),
+                "instruction": "Call the tool above yourself, then pipe the ticket text back \
+                                into the next step so later commands can use it.",
+            });
+            output::emit("fetch", &data, |value| {
+                format!(
+                    "Call {}.{} with {}, then run: {}",
+                    value["request"]["server"].as_str().unwrap_or(""),
+                    value["request"]["tool"].as_str().unwrap_or(""),
+                    value["request"]["arguments"],
+                    value["nextStep"].as_str().unwrap_or(""),
+                )
+            });
+            return Ok(());
+        }
+    };
     let stored = item.write(store::SOURCE, &ticket_data.as_markdown())?;
     item.touch_meta(&[
         ("source", json!(name)),

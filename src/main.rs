@@ -157,6 +157,22 @@ enum Command {
         #[arg(long, default_value_t = 8)]
         max_files: usize,
     },
+    /// Call a config-declared external system (REST first, MCP hint as fallback).
+    Connect {
+        /// System name as declared under `connectors:`.
+        system: String,
+        /// Declared verb. Omit to list what is available.
+        #[arg(default_value = "")]
+        verb: String,
+        /// Verb arguments as key=value. Repeatable.
+        #[arg(long = "arg")]
+        args: Vec<String>,
+    },
+    /// Read design structure and map it to this project's code.
+    Design {
+        #[command(subcommand)]
+        command: DesignCommand,
+    },
     /// Bugfix workflow.
     Bug {
         #[command(subcommand)]
@@ -171,6 +187,36 @@ enum Command {
     Skills {
         #[command(subcommand)]
         command: SkillsCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum DesignCommand {
+    /// Distilled structure of the whole file.
+    File {
+        #[arg(long, default_value_t = 3)]
+        depth: usize,
+    },
+    /// Distilled structure of one node.
+    Node {
+        node: String,
+        #[arg(long, default_value_t = 5)]
+        depth: usize,
+    },
+    /// Design tokens behind colours, spacing, and typography.
+    Variables,
+    /// Rendered frame URLs for the agent to look at.
+    Image {
+        node: String,
+        #[arg(long, default_value = "2")]
+        scale: String,
+    },
+    /// Line design component names up against the indexed code components.
+    Map {
+        /// Design component names, e.g. `Button/Primary`. Repeatable.
+        names: Vec<String>,
+        #[arg(long)]
+        budget: Option<usize>,
     },
 }
 
@@ -318,6 +364,32 @@ fn dispatch(command: &Command) -> (&'static str, Result<bool>) {
             "split",
             commands::work::split(ticket, *max_files).map(|_| true),
         ),
+        Command::Connect { system, verb, args } => (
+            "connect",
+            commands::connect::connect(system, verb, args).map(|_| true),
+        ),
+        Command::Design { command } => match command {
+            DesignCommand::File { depth } => (
+                "design",
+                commands::design::design("file", "", *depth, "2").map(|_| true),
+            ),
+            DesignCommand::Node { node, depth } => (
+                "design",
+                commands::design::design("node", node, *depth, "2").map(|_| true),
+            ),
+            DesignCommand::Variables => (
+                "design",
+                commands::design::design("variables", "", 0, "2").map(|_| true),
+            ),
+            DesignCommand::Image { node, scale } => (
+                "design",
+                commands::design::design("image", node, 0, scale).map(|_| true),
+            ),
+            DesignCommand::Map { names, budget } => (
+                "design.map",
+                commands::design::map(names, *budget).map(|_| true),
+            ),
+        },
         Command::Bug { command } => match command {
             BugCommand::Fetch {
                 ticket,
