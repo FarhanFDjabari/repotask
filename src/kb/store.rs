@@ -150,9 +150,18 @@ impl KnowledgeBase {
 pub fn load(source: KnowledgeSource) -> Result<KnowledgeBase> {
     let manifest_path = source.path.join(MANIFEST_NAME);
     if !manifest_path.is_file() {
+        // An empty directory is what `init` leaves behind, so the local case is a
+        // missing scaffold rather than a wrong path. A remote without a manifest is
+        // the wrong repository, and re-syncing it would not add one.
         bail!(
-            "{MANIFEST_NAME} not found in {}. This does not look like a RepoTask knowledge base.",
-            source.path.display()
+            "{MANIFEST_NAME} not found in {}. {}",
+            source.path.display(),
+            if source.kind == "remote" {
+                "This repository does not look like a RepoTask knowledge base; check \
+                 `knowledge.remote` in .repo-task/config.yaml."
+            } else {
+                "Run `repo-task kb init` to scaffold a starter knowledge base."
+            }
         );
     }
     let manifest = load_manifest(&manifest_path)?;

@@ -80,9 +80,10 @@ pub fn resolve(config: &RepoTaskConfig, sync: Option<bool>) -> Result<KnowledgeS
     }
     let local = config.root.join(&knowledge.local);
     if !local.is_dir() {
+        // `kb sync` cannot help here: a local knowledge base is scaffolded, not fetched.
         bail!(
-            "Knowledge base not found at {}. Configure `knowledge.remote` or create the \
-             directory, then run `repo-task kb sync`.",
+            "Knowledge base not found at {}. Run `repo-task kb init` to scaffold one, or set \
+             `knowledge.remote` in .repo-task/config.yaml to use a shared one.",
             local.display()
         );
     }
