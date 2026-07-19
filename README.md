@@ -23,12 +23,27 @@ the agent a ranked, token-budgeted subset. An Android task never pays for the iO
 
 ## Install
 
+A single static binary — no runtime, no interpreter, nothing to keep on the PATH but the tool
+itself. Download the archive for your platform from the
+[releases page](https://github.com/FarhanFDjabari/repotask/releases) and put `repo-task` somewhere
+on your `PATH`:
+
 ```bash
-uv tool install repotask     # or: pipx install repotask
+tar -xzf repo-task-v0.2.0-aarch64-apple-darwin.tar.gz
+install -m 755 repo-task /usr/local/bin/
 repo-task --version
 ```
 
+Or build from source with a Rust toolchain:
+
+```bash
+cargo install --path .
+```
+
 Install once per machine. Each project keeps only a small config file and generated agent skills.
+
+**Why a binary matters here.** An agent calls this CLI 10–40 times in a session, so startup cost is
+felt as latency. `brief` returns in ~23 ms; the Python implementation it replaced took ~324 ms.
 
 ## Quick start
 
@@ -160,11 +175,27 @@ which sections became knowledge-base concerns. Move your old `rules/*.md` into `
 ## Development
 
 ```bash
-python3 -m venv .venv && . .venv/bin/activate
-pip install -e '.[dev]'
-pytest
-ruff check .
+cargo test
+cargo clippy --all-targets -- -D warnings
+cargo fmt
 ```
+
+Tests build real git repositories in a temp directory, so the remote knowledge-base path — clone,
+pin, fetch — is covered without touching the network.
+
+### Language support and binary size
+
+The default build carries nine tree-sitter grammars (Kotlin, Java, Swift, Dart, TypeScript/TSX,
+JavaScript, Python, Go, Rust) and weighs about 15 MB. Grammars sit behind cargo features if you
+want a smaller binary:
+
+```bash
+cargo build --release --no-default-features --features mobile   # ~10 MB
+cargo build --release --no-default-features --features web,backend
+```
+
+A build without a grammar still runs; it warns and skips files in that language rather than
+pretending they contain nothing.
 
 ## License
 
