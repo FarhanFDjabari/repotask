@@ -1,0 +1,11 @@
+# These files are compiled into the binary by include_dir!. A CRLF checkout would
+# bake platform-specific line endings into the artifact, so pin them to LF.
+seed/** text eol=lf
+skills-templates/** text eol=lf
+
+# Rust sources and manifests: keep the tree consistent across platforms.
+*.rs text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf

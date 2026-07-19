@@ -174,7 +174,10 @@ mod tests {
     fn every_skill_declares_frontmatter_and_references_commands() {
         for name in SKILLS {
             let content = template(name).expect("template is bundled");
-            assert!(content.starts_with("---\n"), "{name} needs frontmatter");
+            assert!(
+                content.lines().next().map(str::trim) == Some("---"),
+                "{name} needs frontmatter"
+            );
             assert!(content.contains(&format!("name: {name}\n")));
             assert!(content.contains("description:"));
             assert!(
