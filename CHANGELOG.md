@@ -46,15 +46,14 @@ This is a breaking change; run `repo-task migrate` to upgrade a 0.1 project.
 
 ### Changed
 
-- Configuration moved to `.repo-task/config.yaml` at schema version 2, validated with pydantic.
-- The CLI now installs globally (`uv tool install` / `pipx install`) rather than per project;
-  Python 3.10+ is required and third-party dependencies are used again.
+- Configuration moved to `.repo-task/config.yaml` at schema version 2.
+- The CLI now installs globally (a downloaded binary or `cargo install`) rather than per project.
 
 ### Removed
 
 - The `start`, `context`, `investigate`, `review`, `cr`, `status`, and `list` commands, along
   with the prompt, agent-assignment, rules, and template services they used.
-- The portable zipapp build and its release artifact.
+- The portable zipapp build and its release artifact, along with the Python packaging.
 
 ## 0.1.1 - Unreleased
 
