@@ -18,6 +18,7 @@ pub const SKILLS: &[&str] = &[
     "repotask-feature",
     "repotask-bugfix",
     "repotask-review",
+    "repotask-design",
 ];
 pub const CLAUDE_SKILLS_DIR: &str = ".claude/skills";
 pub const AGENTS_FILE: &str = "AGENTS.md";
@@ -72,6 +73,12 @@ Then, as needed:
 | Where a declaration lives | `repo-task --json symbol <name>` |
 | Ticket to reviewable steps | `repo-task --json fetch\|summarize\|analyze\|split <ticket>` |
 | Bug triage and duplicates | `repo-task --json bug fetch <ticket>`, `repo-task --json bug dedupe` |
+| Design structure and mapping | `repo-task --json design node <id>`, `repo-task --json design map <names>` |
+| Any declared external system | `repo-task --json connect <system> <verb> --arg k=v` |
+
+Prefer these over calling an external API yourself: the CLI performs the call and returns
+the distilled result, so you pay context for the answer rather than the whole payload. When
+it cannot make the call it hands you the tool to run through your own connection.
 
 Every command returns `{{"ok": ..., "command": ..., "data": ..., "warnings": []}}`.
 Read `data`; on failure `error.message` says what to do next.

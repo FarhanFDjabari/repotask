@@ -104,6 +104,8 @@ Every command takes `--json` and returns the same envelope:
 | Query | `brief`, `search`, `convention`, `recipe`, `fact`, `symbol` |
 | Index | `index [--changed-only]` |
 | Feature flow | `fetch`, `summarize`, `analyze`, `split` |
+| Design | `design file`, `design node`, `design variables`, `design image`, `design map` |
+| External systems | `connect <system> <verb>` |
 | Bugfix flow | `bug fetch`, `bug dedupe` |
 
 ### Feature flow
@@ -130,22 +132,83 @@ does not close or merge anything; a human decides.
 
 ## Connectors
 
-Jira, GitHub, GitLab, and ClickUp, in one of two modes per system:
+Jira, GitHub, GitLab, and ClickUp are built in. **REST is the primary path**: the CLI makes the
+call and distils the response, so the agent pays context for the *result* rather than the payload.
+On a representative task payload that is 10,995 bytes down to 147. REST also reaches systems that
+have no MCP server at all.
 
-- **`mcp`** (default) — the CLI returns the tool call and the *agent* makes it through its own
-  connection. No credentials in the CLI.
-- **`rest`** — the CLI calls the API itself. Cheaper, and works without an agent connection.
+**MCP is the fallback** for when the CLI cannot make the call — no credential configured, no
+network, a server that is down — because the agent's own connection may still succeed.
 
 ```yaml
 connectors:
   jira:
-    mode: rest
+    mode: auto            # auto (default) | rest | mcp | off
     base_url: https://acme.atlassian.net
     project: ACME
 ```
 
-REST credentials come from the environment (`REPOTASK_JIRA_TOKEN`) or `~/.repo-task/secrets.yaml`
-— never from the project repository.
+The rule for falling back: **no answer, not an unwelcome answer.** A 404 means the ticket does not
+exist, and asking the agent to retry it spends tokens to reach the same place, so that surfaces as
+an error. A missing credential or a 5xx falls back. `mode: rest` never falls back silently, and
+every fallback is announced in the envelope's `warnings`.
+
+Credentials come from the environment (`REPOTASK_JIRA_TOKEN`) or `~/.repo-task/secrets.yaml` —
+never from the project repository.
+
+### Any other system
+
+Declare the call and the CLI will make it. No built-in connector needed, and no MCP server needed:
+
+```yaml
+connectors:
+  acme:
+    mode: auto
+    base_url: https://api.acme.dev
+    auth_header: Authorization
+    auth_format: "Bearer {token}"
+    verbs:
+      task:
+        path: /v1/task/{id}
+        fields: [data.id, data.name, data.assignees.username]   # project the response
+        mcp_tool: acme_get_task                                  # optional fallback
+```
+
+```bash
+repo-task connect acme task --arg id=T-1
+```
+
+`fields` is what keeps the result small — dotted paths, and a path through an array maps over its
+elements. Argument values are percent-encoded, so an argument cannot add path segments.
+
+## Design
+
+```bash
+repo-task design file                 # distilled structure of the Figma file
+repo-task design node 1:2 --depth 5   # one frame's structure
+repo-task design variables            # design tokens
+repo-task design image 1:2            # rendered URLs for the agent to look at
+repo-task design map "Button/Primary" "FeedCard"
+```
+
+A raw Figma node tree is mostly transform matrices and vector geometry that say nothing about how
+to build a screen. `design` keeps the frames, components, text, layout, and variables and drops the
+rest. Images are the exception: the CLI cannot look at a frame, so it returns the rendered URL and
+lets the agent view it.
+
+`design map` is the part the agent cannot get from Figma — which of *this project's* components
+already implements a given design component:
+
+```text
+Design component -> code
+  PrimaryButton                ui/src/main/kotlin/com/acme/ui/Components.kt
+  FeedCard                     ui/src/main/kotlin/com/acme/ui/Components.kt
+
+No code found for: Checkout/PaymentSheet
+```
+
+Configure it with the Figma file key as `project`, and a token in `REPOTASK_FIGMA_TOKEN`. Without a
+token it falls back to the Figma MCP server, which already holds the user's session.
 
 ## Agent skills
 
