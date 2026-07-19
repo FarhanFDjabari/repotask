@@ -15,8 +15,13 @@ Returns the report, the impact set it resolves to, and this project's convention
 that code. Find the root cause before proposing a fix, and name which impacted symbol
 you believe is responsible.
 
-If the connector runs in `mcp` mode, the first response contains a tool call — make it,
-store the report with `repo-task fetch <ticket> --write -`, then run `bug fetch` again.
+Use this even when you have an MCP tool for the tracker — the CLI routes the call and
+stores the report where the impact analysis reads it.
+
+If the first response contains a tool call instead of the report, the CLI could not reach
+the API itself (connector in `mcp` mode, or `auto` mode with no credential configured).
+Make that call, store the report with `repo-task fetch <ticket> --write -`, then run
+`bug fetch` again.
 
 ## Find duplicates
 
@@ -25,8 +30,8 @@ repo-task --json bug dedupe
 repo-task --json bug dedupe --threshold 0.5   # stricter grouping
 ```
 
-Clusters tickets whose reports resolve to the same files and symbols. In `mcp` mode it
-returns a search call; make it and pipe the tickets back as JSON:
+Clusters tickets whose reports resolve to the same files and symbols. When the CLI cannot
+reach the API itself it returns a search call; make it and pipe the tickets back as JSON:
 
 ```bash
 repo-task bug dedupe --tickets -   # [{"id": "...", "title": "...", "body": "..."}]

@@ -76,9 +76,21 @@ Then, as needed:
 | Design structure and mapping | `repo-task --json design node <id>`, `repo-task --json design map <names>` |
 | Any declared external system | `repo-task --json connect <system> <verb> --arg k=v` |
 
-Prefer these over calling an external API yourself: the CLI performs the call and returns
-the distilled result, so you pay context for the answer rather than the whole payload. When
-it cannot make the call it hands you the tool to run through your own connection.
+### Reaching an external system
+
+Route every ticket, issue, or document lookup through `repo-task`, including when you have
+an MCP tool for that system. The CLI is not competing with that tool — it decides whether
+to call the REST API itself or to hand the call back to you, and it stores the result where
+the later steps read it.
+
+You cannot make that decision correctly: it depends on which credentials are configured,
+which you cannot see. The CLI can, so let it route.
+
+When it calls REST you get the distilled result and pay context for the answer rather than
+the whole payload. When it cannot — no credential, no network, an OAuth-only system — the
+response carries a `request` naming the MCP tool to call. Make that call, then pipe the
+result back with `--write -` so the work is stored and `summarize`, `analyze`, and `split`
+can use it. Skipping that step leaves nothing on disk and the next command will fail.
 
 Every command returns `{{"ok": ..., "command": ..., "data": ..., "warnings": []}}`.
 Read `data`; on failure `error.message` says what to do next.

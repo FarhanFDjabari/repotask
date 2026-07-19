@@ -14,8 +14,12 @@ The CLI never calls a model; it fetches, filters, and computes impact.
 repo-task --json fetch <ticket>
 ```
 
-If the connector runs in `mcp` mode the response contains `request` instead of the
-ticket: call that tool yourself, then store the result.
+Use this even when you have an MCP tool for the tracker — the CLI routes the call and
+stores the result for the later steps.
+
+If the response contains `request` instead of the ticket, the CLI could not reach the API
+itself (connector in `mcp` mode, or `auto` mode with no credential configured). Call the
+tool it names, then store the result — without this the later steps have nothing to read.
 
 ```bash
 repo-task fetch <ticket> --write -   # pipe the ticket text on stdin
