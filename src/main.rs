@@ -15,7 +15,8 @@ mod skills;
 mod workflow;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::Shell;
 
 use workflow::dedupe::MIN_SIMILARITY;
 
@@ -187,6 +188,11 @@ enum Command {
     Skills {
         #[command(subcommand)]
         command: SkillsCommand,
+    },
+    /// Print a shell completion script, e.g. `repo-task completions zsh`.
+    Completions {
+        /// bash, zsh, fish, elvish, or powershell.
+        shell: Shell,
     },
 }
 
@@ -429,11 +435,22 @@ fn dispatch(command: &Command) -> (&'static str, Result<bool>) {
                 commands::skills::sync(*dry_run).map(|_| true),
             ),
         },
+        // `main` prints the script and returns before dispatch: a completion script is
+        // shell source, so it cannot be wrapped in the envelope.
+        Command::Completions { .. } => unreachable!(),
     }
 }
 
 fn main() -> std::process::ExitCode {
     let cli = Cli::parse();
+
+    if let Command::Completions { shell } = cli.command {
+        let mut command = Cli::command();
+        let name = command.get_name().to_string();
+        clap_complete::generate(shell, &mut command, name, &mut std::io::stdout());
+        return std::process::ExitCode::SUCCESS;
+    }
+
     output::set_json_mode(cli.json);
 
     let (name, result) = dispatch(&cli.command);

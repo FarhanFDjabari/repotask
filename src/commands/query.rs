@@ -58,9 +58,12 @@ fn render_documents(value: &Value) -> String {
         .iter()
         .map(|document| {
             format!(
-                "# {}\n{}\n\n{}",
-                document["title"].as_str().unwrap_or(""),
-                document["path"].as_str().unwrap_or(""),
+                "{}\n{}\n\n{}",
+                output::style::heading(&format!(
+                    "# {}",
+                    document["title"].as_str().unwrap_or("")
+                )),
+                output::style::dim(document["path"].as_str().unwrap_or("")),
                 document["body"].as_str().unwrap_or(""),
             )
         })
@@ -139,11 +142,11 @@ pub fn search(query: &str, layer: &str, limit: usize) -> Result<()> {
         hits.iter()
             .map(|hit| {
                 format!(
-                    "{:<26} {:<11} {}\n    {}",
-                    hit["id"].as_str().unwrap_or(""),
+                    "{} {:<11} {}\n    {}",
+                    output::style::id(&format!("{:<26}", hit["id"].as_str().unwrap_or(""))),
                     hit["layer"].as_str().unwrap_or(""),
                     hit["title"].as_str().unwrap_or(""),
-                    hit["excerpt"].as_str().unwrap_or(""),
+                    output::style::dim(hit["excerpt"].as_str().unwrap_or("")),
                 )
             })
             .collect::<Vec<_>>()

@@ -63,10 +63,13 @@ pub fn index(changed_only: bool) -> Result<()> {
     });
 
     output::emit("index", &data, |value| {
-        let mut lines = vec!["Indexed project facts".to_string()];
+        let mut lines = vec![output::style::heading("Indexed project facts")];
         if let Some(families) = value["families"].as_object() {
             for (name, count) in families {
-                lines.push(format!("  {name:<16} {count}"));
+                lines.push(format!(
+                    "  {} {count}",
+                    output::style::id(&format!("{name:<16}"))
+                ));
             }
         }
         lines.join("\n")
@@ -136,11 +139,14 @@ pub fn symbol(query: &str, kind: Option<&str>, limit: usize) -> Result<()> {
         hits.iter()
             .map(|hit| {
                 format!(
-                    "{:<28} {:<10} {}:{}",
-                    hit["name"].as_str().unwrap_or(""),
+                    "{} {:<10} {}",
+                    output::style::id(&format!("{:<28}", hit["name"].as_str().unwrap_or(""))),
                     hit["kind"].as_str().unwrap_or(""),
-                    hit["path"].as_str().unwrap_or(""),
-                    hit["line"]
+                    output::style::dim(&format!(
+                        "{}:{}",
+                        hit["path"].as_str().unwrap_or(""),
+                        hit["line"]
+                    )),
                 )
             })
             .collect::<Vec<_>>()
@@ -183,16 +189,19 @@ pub fn fact(family: &str, query: &str, limit: usize) -> Result<()> {
             "available": available,
         });
         output::emit("fact", &data, |value| {
-            let mut lines = vec!["Fact families".to_string()];
+            let mut lines = vec![output::style::heading("Fact families")];
             if let Some(families) = value["families"].as_array() {
                 for item in families {
                     lines.push(format!(
-                        "  {:<16} {:<4} {}",
-                        item["name"].as_str().unwrap_or(""),
+                        "  {} {} {}",
+                        output::style::id(&format!(
+                            "{:<16}",
+                            item["name"].as_str().unwrap_or("")
+                        )),
                         if item["indexed"].as_bool().unwrap_or(false) {
-                            "yes"
+                            output::style::pass("yes ")
                         } else {
-                            "no"
+                            output::style::fail("no  ")
                         },
                         item["description"].as_str().unwrap_or(""),
                     ));
@@ -238,18 +247,21 @@ pub fn fact(family: &str, query: &str, limit: usize) -> Result<()> {
                 value["family"].as_str().unwrap_or("")
             );
         }
-        let mut lines = vec![format!(
+        let mut lines = vec![output::style::heading(&format!(
             "{} ({})",
             value["family"].as_str().unwrap_or(""),
             value["count"]
-        )];
+        ))];
         for entry in entries {
             lines.push(format!(
-                "  {:<28} {:<10} {}:{}",
-                entry["name"].as_str().unwrap_or(""),
+                "  {} {:<10} {}",
+                output::style::id(&format!("{:<28}", entry["name"].as_str().unwrap_or(""))),
                 entry["kind"].as_str().unwrap_or(""),
-                entry["path"].as_str().unwrap_or(""),
-                entry["line"],
+                output::style::dim(&format!(
+                    "{}:{}",
+                    entry["path"].as_str().unwrap_or(""),
+                    entry["line"]
+                )),
             ));
         }
         lines.join("\n")
