@@ -1,6 +1,25 @@
 # Changelog
 
-## 0.2.0 - Unreleased
+## 0.2.1 - Unreleased
+
+### Fact families apply to the project's stacks
+
+`stacks` on a fact family was declared in the schema but never read, so it documented
+an intent the CLI did not enforce. It now filters: a family whose `stacks` share
+nothing with `project.stacks` is not built. An empty `stacks` still means every stack.
+
+### Components are no longer web-only
+
+The `components` family excluded mobile through `languages: [typescript, tsx,
+javascript]`, so Compose and Flutter components were unreachable. That list is gone and
+the mobile stacks are declared. Because PascalCase means "every class" outside
+TypeScript, a `path_pattern` now carries the precision the language list had been
+providing by accident.
+
+SwiftUI remains uncovered: its views are structs, and the Swift extractor does not
+index `struct_declaration`.
+
+## 0.2.0 - 2026-07-19
 
 ### Rewritten in Rust
 

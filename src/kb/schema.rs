@@ -32,8 +32,12 @@ pub struct FactFamily {
     pub name: String,
     #[serde(default)]
     pub description: String,
+    /// Project stacks this family applies to. Empty means every stack. A family
+    /// that matches none of `project.stacks` is not built at all.
     #[serde(default)]
     pub stacks: Vec<String>,
+    /// Languages a symbol may be written in. Empty means every language — prefer
+    /// `path_pattern` over listing languages to keep a family off other stacks.
     #[serde(default)]
     pub languages: Vec<String>,
     #[serde(default)]

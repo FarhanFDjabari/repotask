@@ -49,9 +49,18 @@ pub fn collect(family: &FactFamily, index: &IndexResult) -> Result<Vec<Value>> {
         .collect()
 }
 
-/// Every declared family plus the raw `symbols` family the index always provides.
+/// Whether a family applies to a project declaring `stacks`.
+///
+/// An empty `stacks` means the family is stack-agnostic and always applies.
+fn applies_to(family: &FactFamily, stacks: &[String]) -> bool {
+    family.stacks.is_empty() || family.stacks.iter().any(|stack| stacks.contains(stack))
+}
+
+/// Every declared family that applies to `stacks`, plus the raw `symbols` family
+/// the index always provides.
 pub fn build_all(
     families: &[FactFamily],
+    stacks: &[String],
     index: &IndexResult,
 ) -> Result<BTreeMap<String, Vec<Value>>> {
     let mut result: BTreeMap<String, Vec<Value>> = BTreeMap::new();
@@ -66,6 +75,9 @@ pub fn build_all(
         if family.name == SYMBOLS_FAMILY {
             bail!("'{SYMBOLS_FAMILY}' is reserved and cannot be redeclared.");
         }
+        if !applies_to(family, stacks) {
+            continue;
+        }
         result.insert(family.name.clone(), collect(family, index)?);
     }
     Ok(result)
@@ -78,4 +90,58 @@ fn compile(family: &FactFamily) -> Result<Option<Regex>> {
     Regex::new(&family.name_pattern)
         .map(Some)
         .with_context(|| format!("Fact family '{}' has an invalid name_pattern", family.name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn family(name: &str, stacks: &[&str]) -> FactFamily {
+        FactFamily {
+            name: name.into(),
+            stacks: stacks.iter().map(|stack| stack.to_string()).collect(),
+            ..FactFamily::default()
+        }
+    }
+
+    fn stacks(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    #[test]
+    fn a_family_without_stacks_applies_everywhere() {
+        assert!(applies_to(
+            &family("screens", &[]),
+            &stacks(["go"].as_slice())
+        ));
+    }
+
+    #[test]
+    fn a_family_applies_when_one_stack_overlaps() {
+        let components = family("components", &["web", "flutter"]);
+
+        assert!(applies_to(&components, &stacks(&["dart", "flutter"])));
+    }
+
+    #[test]
+    fn a_family_is_skipped_when_no_stack_overlaps() {
+        let components = family("components", &["web", "flutter"]);
+
+        assert!(!applies_to(&components, &stacks(&["go", "rust"])));
+    }
+
+    #[test]
+    fn build_all_omits_families_the_project_does_not_use() {
+        let index = IndexResult::default();
+        let families = vec![family("components", &["web"]), family("usecases", &[])];
+
+        let built = build_all(&families, &stacks(&["rust"]), &index).unwrap();
+
+        assert!(built.contains_key(SYMBOLS_FAMILY));
+        assert!(built.contains_key("usecases"));
+        assert!(
+            !built.contains_key("components"),
+            "a web-only family must not be built for a Rust project"
+        );
+    }
 }

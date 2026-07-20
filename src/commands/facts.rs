@@ -24,7 +24,7 @@ pub fn index(changed_only: bool) -> Result<()> {
         );
     }
     let result = build_index(&config, changed_only.then_some(paths.as_slice()))?;
-    let families = build_all(&kb.manifest.fact_families, &result)?;
+    let families = build_all(&kb.manifest.fact_families, &config.project.stacks, &result)?;
 
     let mut written: Vec<String> = Vec::new();
     let mut counts = serde_json::Map::new();

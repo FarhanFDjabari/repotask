@@ -33,7 +33,9 @@ fact_families:
 
   - name: components
     description: Reusable UI components
-    stacks: [web, typescript, react-native]
-    languages: [typescript, tsx, javascript]
+    stacks: [web, typescript, react-native, android, jetpack-compose, flutter, dart]
     kinds: [function, class]
     name_pattern: "^[A-Z][A-Za-z0-9]*$"
+    # PascalCase alone means "every class" outside TypeScript, so the directory
+    # is what actually distinguishes a component from the rest of the codebase.
+    path_pattern: "**/{components,widgets,ui}/**"
