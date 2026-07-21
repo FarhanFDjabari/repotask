@@ -10,31 +10,31 @@ default_budget: 6000
 fact_families:
   - name: viewmodels
     description: Presentation-layer state holders
-    stacks: [android, kotlin, ios, swift]
-    kinds: [class]
+    stacks: [android, kotlin, ios, swift, swiftui]
+    kinds: [class, struct, actor, enum]
     name_pattern: ".*(ViewModel|Presenter)$"
 
   - name: repositories
     description: Data-access entry points
-    stacks: [android, kotlin, ios, swift, flutter, dart, typescript]
-    kinds: [class, interface, protocol]
+    stacks: [android, kotlin, ios, swift, swiftui, flutter, dart, typescript]
+    kinds: [class, struct, actor, enum, interface, protocol]
     name_pattern: ".*(Repository|Repo|DataSource)$"
 
   - name: screens
     description: User-facing screens and pages
-    stacks: [android, ios, flutter, react-native, web, typescript]
+    stacks: [android, ios, swiftui, flutter, react-native, web, typescript]
     name_pattern: ".*(Screen|Page|Activity|Fragment|View)$"
 
   - name: usecases
     description: Domain operations
-    stacks: [android, kotlin, ios, swift, flutter, dart]
-    kinds: [class, interface, protocol]
+    stacks: [android, kotlin, ios, swift, swiftui, flutter, dart]
+    kinds: [class, struct, actor, enum, interface, protocol]
     name_pattern: ".*(UseCase|Interactor)$"
 
   - name: components
     description: Reusable UI components
-    stacks: [web, typescript, react-native, android, jetpack-compose, flutter, dart]
-    kinds: [function, class]
+    stacks: [web, typescript, react-native, android, jetpack-compose, swiftui, flutter, dart]
+    kinds: [function, class, struct]
     name_pattern: "^[A-Z][A-Za-z0-9]*$"
     # PascalCase alone means "every class" outside TypeScript, so the directory
     # is what actually distinguishes a component from the rest of the codebase.

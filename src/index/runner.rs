@@ -175,10 +175,13 @@ fn extract(parser: &mut Parser, language: &str, source: &[u8], relative: &str) -
             .iter()
             .find(|(node_type, _)| *node_type == node.kind())
         {
-            if let Some(name) = name_of(&node, source) {
+            if let Some(name) =
+                name_of(&node, source).filter(|_| !is_swift_extension(language, &node))
+            {
+                let kind = refine_kind(language, &node, kind);
                 symbols.push(Symbol {
                     name: name.clone(),
-                    kind: (*kind).to_string(),
+                    kind: kind.to_string(),
                     language: language.to_string(),
                     path: relative.to_string(),
                     line: node.start_position().row + 1,
@@ -198,6 +201,37 @@ fn extract(parser: &mut Parser, language: &str, source: &[u8], relative: &str) -
         }
     }
     symbols
+}
+
+/// Swift folds `struct`, `class`, `actor`, and `enum` into a single
+/// `class_declaration`; the leading keyword is what distinguishes them. Report
+/// each keyword as its own kind so families can target them precisely.
+/// `class` and anything else keep the mapped kind.
+fn refine_kind<'a>(language: &str, node: &Node, kind: &'a str) -> &'a str {
+    if language == "swift" && node.kind() == "class_declaration" {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "struct" => return "struct",
+                "actor" => return "actor",
+                "enum" => return "enum",
+                _ => {}
+            }
+        }
+    }
+    kind
+}
+
+/// An `extension` also parses as a Swift `class_declaration`, but its `name`
+/// field is the *extended* type, so indexing it would emit a phantom symbol that
+/// collides with the real declaration and matches families by that borrowed name.
+/// Extensions are not declarations, so they are skipped.
+fn is_swift_extension(language: &str, node: &Node) -> bool {
+    language == "swift"
+        && node.kind() == "class_declaration"
+        && node
+            .children(&mut node.walk())
+            .any(|child| child.kind() == "extension")
 }
 
 fn name_of(node: &Node, source: &[u8]) -> Option<String> {

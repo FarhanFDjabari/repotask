@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.3 - 2026-07-21
+
+### SwiftUI views and components are indexed
+
+Swift's grammar folds `struct`, `class`, `actor`, and `enum` into one
+`class_declaration` node, so every Swift type was recorded as a `class`. SwiftUI
+views and components are structs, which left them indistinguishable from reference
+types and kept the `components` family (declared over other stacks) from reaching
+them. The extractor now reads the leading keyword and reports `struct`, `actor`, and
+`enum` as their own kinds. The `components`, `screens`, `viewmodels`, `repositories`,
+and `usecases` families declare the `swiftui` stack and accept the new kinds where
+they already accepted `class`.
+
+An `extension` also parses as a `class_declaration`, and its `name` field is the
+*extended* type — so it was being indexed as a phantom symbol under a borrowed name
+(an `extension View` surfaced as a `View` screen). Extensions are no longer emitted;
+declarations nested inside them still are.
+
 ## 0.2.2 - 2026-07-21
 
 ### Colorized human output
@@ -37,9 +55,6 @@ javascript]`, so Compose and Flutter components were unreachable. That list is g
 the mobile stacks are declared. Because PascalCase means "every class" outside
 TypeScript, a `path_pattern` now carries the precision the language list had been
 providing by accident.
-
-SwiftUI remains uncovered: its views are structs, and the Swift extractor does not
-index `struct_declaration`.
 
 ## 0.2.0 - 2026-07-19
 
