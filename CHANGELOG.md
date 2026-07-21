@@ -1,6 +1,28 @@
 # Changelog
 
-## 0.2.1 - Unreleased
+## 0.2.2 - 2026-07-21
+
+### Colorized human output
+
+`doctor`, `search`, `symbol`, `fact`, `index`, and `convention`/`recipe` now use color
+for headings, ids, and pass/fail state. Styling goes through `anstream`, which strips it
+when stdout is not a terminal, so `--json`, piped output, and `NO_COLOR` stay plain. The
+agent-facing JSON envelope is unchanged and byte-identical, because color lives only in
+the human renderers, below the `output::emit` seam.
+
+### Shell completions
+
+`repo-task completions <shell>` prints a completion script for bash, zsh, fish, elvish,
+or powershell. It is handled before command dispatch, since a completion script is shell
+source and cannot be wrapped in the envelope.
+
+### Build-size documentation
+
+The README now carries measured per-feature binary sizes and notes that trimming
+grammars is a download-size lever only: grammar tables are static pages touched solely
+when a matching file is parsed, so every build starts in ~4 ms regardless of size.
+
+## 0.2.1 - 2026-07-20
 
 ### Fact families apply to the project's stacks
 
