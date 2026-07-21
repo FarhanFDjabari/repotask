@@ -176,9 +176,10 @@ fn extract(parser: &mut Parser, language: &str, source: &[u8], relative: &str) -
             .find(|(node_type, _)| *node_type == node.kind())
         {
             if let Some(name) = name_of(&node, source) {
+                let kind = refine_kind(language, &node, kind);
                 symbols.push(Symbol {
                     name: name.clone(),
-                    kind: (*kind).to_string(),
+                    kind: kind.to_string(),
                     language: language.to_string(),
                     path: relative.to_string(),
                     line: node.start_position().row + 1,
@@ -198,6 +199,23 @@ fn extract(parser: &mut Parser, language: &str, source: &[u8], relative: &str) -
         }
     }
     symbols
+}
+
+/// Swift folds `struct`, `class`, `actor`, and `enum` into a single
+/// `class_declaration`; the leading keyword is what distinguishes them. Split
+/// out `struct` so SwiftUI views and components can be targeted precisely.
+/// Other keywords keep the mapped kind.
+fn refine_kind<'a>(language: &str, node: &Node, kind: &'a str) -> &'a str {
+    if language == "swift" && node.kind() == "class_declaration" {
+        let mut cursor = node.walk();
+        if node
+            .children(&mut cursor)
+            .any(|child| child.kind() == "struct")
+        {
+            return "struct";
+        }
+    }
+    kind
 }
 
 fn name_of(node: &Node, source: &[u8]) -> Option<String> {

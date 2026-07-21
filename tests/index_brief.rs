@@ -5,6 +5,7 @@ use serde_json::Value;
 
 const SWIFT_SOURCE: &str =
     "import Foundation\n\nclass FeedViewModel: ObservableObject {\n    func load() {}\n}\n";
+const SWIFTUI_SOURCE: &str = "import SwiftUI\n\nstruct ContentView: View {\n    var body: some View { Text(\"hi\") }\n}\n\nclass FeedViewModel: ObservableObject {}\n";
 const PYTHON_SOURCE: &str =
     "class Loader:\n    def load(self) -> None:\n        pass\n\n\ndef helper() -> int:\n    return 1\n";
 
@@ -46,6 +47,27 @@ fn extracts_kotlin_classes_and_functions_with_scope() {
     assert!(found.contains(&("FeedRepository".into(), "class".into(), String::new())));
     assert!(found.contains(&("load".into(), "function".into(), "FeedViewModel".into())));
     assert!(found.contains(&("fetch".into(), "function".into(), "FeedRepository".into())));
+}
+
+#[test]
+fn swift_structs_are_indexed_distinctly_from_classes() {
+    let fixture = Fixture::new("index-swift-struct");
+    write(&fixture.project, "ios/ContentView.swift", SWIFTUI_SOURCE);
+    fixture.run(&["kb", "sync"]);
+    fixture.run(&["index"]);
+
+    let found: Vec<(String, String)> = symbols(&fixture)
+        .iter()
+        .map(|item| {
+            (
+                item["name"].as_str().unwrap_or("").into(),
+                item["kind"].as_str().unwrap_or("").into(),
+            )
+        })
+        .collect();
+
+    assert!(found.contains(&("ContentView".into(), "struct".into())));
+    assert!(found.contains(&("FeedViewModel".into(), "class".into())));
 }
 
 #[test]
