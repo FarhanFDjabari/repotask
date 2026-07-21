@@ -260,13 +260,23 @@ pin, fetch — is covered without touching the network.
 ### Language support and binary size
 
 The default build carries nine tree-sitter grammars (Kotlin, Java, Swift, Dart, TypeScript/TSX,
-JavaScript, Python, Go, Rust) and weighs about 15 MB. Grammars sit behind cargo features if you
-want a smaller binary:
+JavaScript, Python, Go, Rust) and weighs about 15 MB — the grammars are 83% of that. They sit
+behind cargo features if you want a smaller binary:
 
 ```bash
-cargo build --release --no-default-features --features mobile   # ~10 MB
-cargo build --release --no-default-features --features web,backend
+cargo build --release --no-default-features                     # 2.6 MB, no grammars
+cargo build --release --no-default-features --features backend  # 4.4 MB
+cargo build --release --no-default-features --features web      # 5.7 MB
+cargo build --release --no-default-features --features web,backend  # 7.4 MB
+cargo build --release --no-default-features --features mobile   # 10.7 MB
 ```
+
+`mobile` (Kotlin, Swift, Dart, Java) accounts for 8 MB on its own, so dropping it is most of the
+saving on a web or backend project.
+
+Size is a download-time concern only. Grammar tables are static pages that are never touched
+unless a file of that language is parsed, so a 2.6 MB build and a 15.4 MB build start in the same
+~4 ms — trimming grammars will not make the CLI answer an agent faster.
 
 A build without a grammar still runs; it warns and skips files in that language rather than
 pretending they contain nothing.

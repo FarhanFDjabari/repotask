@@ -221,15 +221,16 @@ fn render_doctor(value: &Value) -> String {
     let Some(checks) = value["checks"].as_array() else {
         return String::new();
     };
-    let mut lines = vec!["repo-task doctor".to_string()];
+    let mut lines = vec![output::style::heading("repo-task doctor")];
     for check in checks {
+        let ok = check["ok"].as_bool().unwrap_or(false);
         lines.push(format!(
-            "  {:<10} {:<5} {}",
+            "  {:<10} {} {}",
             check["name"].as_str().unwrap_or(""),
-            if check["ok"].as_bool().unwrap_or(false) {
-                "ok"
+            if ok {
+                output::style::pass("ok  ")
             } else {
-                "FAIL"
+                output::style::fail("FAIL")
             },
             check["detail"].as_str().unwrap_or(""),
         ));

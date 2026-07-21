@@ -9,10 +9,38 @@
 
 use std::cell::RefCell;
 
+use owo_colors::OwoColorize;
 use serde::Serialize;
 use serde_json::Value;
 
 pub const SCHEMA: &str = "repotask.v2";
+
+/// Styling for the human surface only. Callers must pad *before* styling: a padded
+/// string keeps its column width, whereas padding a styled one counts the escape
+/// bytes and misaligns the row.
+pub mod style {
+    use super::OwoColorize;
+
+    pub fn heading(text: &str) -> String {
+        text.bold().to_string()
+    }
+
+    pub fn id(text: &str) -> String {
+        text.cyan().to_string()
+    }
+
+    pub fn pass(text: &str) -> String {
+        text.green().to_string()
+    }
+
+    pub fn fail(text: &str) -> String {
+        text.red().bold().to_string()
+    }
+
+    pub fn dim(text: &str) -> String {
+        text.dimmed().to_string()
+    }
+}
 
 thread_local! {
     static STATE: RefCell<State> = const { RefCell::new(State::new()) };
@@ -89,9 +117,9 @@ pub fn emit(command: &str, data: &Value, human: impl FnOnce(&Value) -> String) {
         return;
     }
     for message in warnings() {
-        eprintln!("warning: {message}");
+        anstream::eprintln!("{} {message}", style::fail("warning:"));
     }
-    println!("{}", human(data));
+    anstream::println!("{}", human(data));
 }
 
 /// Print a failure envelope. The caller owns the exit code.
@@ -107,5 +135,5 @@ pub fn emit_error(command: &str, message: &str, code: &str) {
         println!("{}", serde_json::to_string(&envelope).unwrap_or_default());
         return;
     }
-    eprintln!("Error: {message}");
+    anstream::eprintln!("{} {message}", style::fail("Error:"));
 }
