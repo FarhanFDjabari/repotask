@@ -194,10 +194,7 @@ pub fn fact(family: &str, query: &str, limit: usize) -> Result<()> {
                 for item in families {
                     lines.push(format!(
                         "  {} {} {}",
-                        output::style::id(&format!(
-                            "{:<16}",
-                            item["name"].as_str().unwrap_or("")
-                        )),
+                        output::style::id(&format!("{:<16}", item["name"].as_str().unwrap_or(""))),
                         if item["indexed"].as_bool().unwrap_or(false) {
                             output::style::pass("yes ")
                         } else {

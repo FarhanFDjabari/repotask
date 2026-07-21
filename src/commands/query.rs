@@ -59,10 +59,7 @@ fn render_documents(value: &Value) -> String {
         .map(|document| {
             format!(
                 "{}\n{}\n\n{}",
-                output::style::heading(&format!(
-                    "# {}",
-                    document["title"].as_str().unwrap_or("")
-                )),
+                output::style::heading(&format!("# {}", document["title"].as_str().unwrap_or(""))),
                 output::style::dim(document["path"].as_str().unwrap_or("")),
                 document["body"].as_str().unwrap_or(""),
             )
