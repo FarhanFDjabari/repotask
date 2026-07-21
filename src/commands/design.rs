@@ -22,9 +22,14 @@ conventions for building a screen. Reuse the components the index already lists 
 creating near-duplicates, and name new ones the way their siblings are named. When the design
 and the code disagree about a component's shape, say so instead of silently following one.";
 
-pub fn design(verb: &str, node: &str, depth: usize, scale: &str) -> Result<()> {
+pub fn design(verb: &str, node: &str, depth: usize, scale: &str, file: &str) -> Result<()> {
     let config = config::load()?;
-    let settings = connector_config(&config, "figma")?;
+    let mut settings = connector_config(&config, "figma")?;
+    // `--file` reaches a file the config does not name, which is most of them: the
+    // configured key is the project's own design file, not every file the user can open.
+    if !file.is_empty() {
+        settings.project = figma::file_key(file)?;
+    }
 
     let attempt = fallback::attempt(
         settings.allows_rest(),
@@ -43,7 +48,7 @@ pub fn design(verb: &str, node: &str, depth: usize, scale: &str) -> Result<()> {
     let structure = match attempt {
         fallback::Attempt::Rest(value) => value,
         fallback::Attempt::FallBack(reason) => {
-            let request = figma::mcp_hint(&settings, verb, node);
+            let request = figma::mcp_hint(&settings, verb, node, depth, scale)?;
             output::warn(format!("Falling back to an MCP call: {reason}"));
             let data = json!({
                 "verb": verb,

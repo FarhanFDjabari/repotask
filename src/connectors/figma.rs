@@ -11,7 +11,7 @@
 //! rendered URL and lets the agent view it directly rather than moving bytes through
 //! a process that cannot use them.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde_json::{json, Map, Value};
 
 use crate::config::ConnectorConfig;
@@ -90,6 +90,28 @@ fn flatten(value: Value) -> Value {
         Value::Array(items) if items.len() == 1 => items[0].clone(),
         _ => value,
     }
+}
+
+/// Read a file key out of `--file`, which takes either the bare key or a pasted link.
+///
+/// A link is what the user actually has to hand, and every Figma editor puts the key
+/// in the same position: `figma.com/<editor>/<key>/<name>`.
+pub fn file_key(input: &str) -> Result<String> {
+    let Some((_, path)) = input.split_once("figma.com/") else {
+        return Ok(input.to_string());
+    };
+    let mut segments = path.split('/');
+    let editor = segments.next().unwrap_or_default();
+    let key = segments
+        .next()
+        .unwrap_or_default()
+        .split(['?', '#'])
+        .next()
+        .unwrap_or_default();
+    if !matches!(editor, "design" | "file" | "board" | "slides" | "proto") || key.is_empty() {
+        bail!("Could not read a file key from '{input}'. Expected figma.com/design/<key>/<name>.");
+    }
+    Ok(key.to_string())
 }
 
 pub fn file(config: &ConnectorConfig, depth: usize) -> Result<Value> {
@@ -208,23 +230,84 @@ fn component_summary(components: &Value) -> Vec<Value> {
         .unwrap_or_default()
 }
 
-pub fn mcp_hint(config: &ConnectorConfig, verb: &str, node_id: &str) -> McpRequest {
+/// Name the node the way the target server expects, or not at all.
+///
+/// The hosted server takes a single `nodeId` on every tool. The desktop bridge reads
+/// the current selection instead, so only its screenshot tool names nodes, and it takes
+/// a list. A hint carrying an argument the server does not declare is rejected outright,
+/// which costs the agent the call and a retry — the fallback is meant to save.
+fn node_argument(dialect: &str, tool: &str, node_id: &str) -> Option<(String, Value)> {
+    if node_id.is_empty() {
+        return None;
+    }
+    match dialect {
+        "bridge" if tool == "get_screenshot" => Some(("nodeIds".into(), json!([node_id]))),
+        "bridge" => None,
+        _ => Some(("nodeId".into(), json!(node_id))),
+    }
+}
+
+/// Carry the flags the caller already gave the CLI, where the server declares them.
+///
+/// Only the bridge does: it takes `depth` when walking the tree and `scale` when
+/// rendering. The hosted server's nearest equivalent is `maxDimension`, a pixel cap
+/// rather than a multiplier, so `--scale` cannot be handed to it unchanged.
+fn tuning(tool: &str, depth: usize, scale: &str) -> Result<Vec<(String, Value)>> {
+    match tool {
+        "get_design_context" => Ok(vec![("depth".into(), json!(depth))]),
+        "get_screenshot" => {
+            let Ok(parsed) = scale.parse::<f64>() else {
+                bail!("--scale '{scale}' is not a number.");
+            };
+            Ok(vec![("scale".into(), json!(parsed))])
+        }
+        _ => Ok(Vec::new()),
+    }
+}
+
+pub fn mcp_hint(
+    config: &ConnectorConfig,
+    verb: &str,
+    node_id: &str,
+    depth: usize,
+    scale: &str,
+) -> Result<McpRequest> {
+    let dialect = config.mcp_dialect.as_str();
+    if !["figma", "bridge"].contains(&dialect) {
+        bail!("Connector 'figma' has mcp_dialect '{dialect}'; use figma or bridge.");
+    }
     let server = if config.mcp_server.is_empty() {
         "figma"
     } else {
         &config.mcp_server
     };
-    let (tool, arguments) = match verb {
-        "image" => ("get_screenshot", json!({"nodeId": node_id})),
-        "variables" => ("get_variable_defs", json!({"nodeId": node_id})),
-        _ => ("get_design_context", json!({"nodeId": node_id})),
+    let tool = match verb {
+        "image" => "get_screenshot",
+        "variables" => "get_variable_defs",
+        _ => "get_design_context",
     };
-    McpRequest {
+    // Naming the file keeps the hint pointed at the same design the REST path would
+    // have read, rather than whatever the user happens to have open. Both servers call
+    // it `fileKey` and reject it empty, so an argument without a value is left out
+    // instead of sent blank.
+    let mut arguments = Map::new();
+    if let Some((name, value)) = node_argument(dialect, tool, node_id) {
+        arguments.insert(name, value);
+    }
+    if dialect == "bridge" {
+        for (name, value) in tuning(tool, depth, scale)? {
+            arguments.insert(name, value);
+        }
+    }
+    if !config.project.is_empty() {
+        arguments.insert("fileKey".into(), json!(config.project));
+    }
+    Ok(McpRequest {
         server: server.to_string(),
         tool: tool.to_string(),
-        arguments,
+        arguments: Value::Object(arguments),
         reason: format!("Read the Figma {verb} through your own Figma connection."),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -333,11 +416,156 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(mcp_hint(&config, "image", "1:2").tool, "get_screenshot");
         assert_eq!(
-            mcp_hint(&config, "variables", "1:2").tool,
+            mcp_hint(&config, "image", "1:2", 0, "2").unwrap().tool,
+            "get_screenshot"
+        );
+        assert_eq!(
+            mcp_hint(&config, "variables", "1:2", 0, "2").unwrap().tool,
             "get_variable_defs"
         );
-        assert_eq!(mcp_hint(&config, "file", "1:2").tool, "get_design_context");
+        assert_eq!(
+            mcp_hint(&config, "file", "1:2", 3, "2").unwrap().tool,
+            "get_design_context"
+        );
+    }
+
+    #[test]
+    fn mcp_hints_name_the_file_they_meant() {
+        let config = ConnectorConfig {
+            project: "abc".into(),
+            ..Default::default()
+        };
+
+        let hint = mcp_hint(&config, "node", "1:2", 5, "2").unwrap();
+
+        assert_eq!(hint.arguments["fileKey"], "abc");
+        assert_eq!(hint.arguments["nodeId"], "1:2");
+    }
+
+    #[test]
+    fn mcp_hints_omit_arguments_that_have_no_value() {
+        let hint = mcp_hint(&ConnectorConfig::default(), "file", "", 3, "2").unwrap();
+
+        assert_eq!(
+            hint.arguments,
+            json!({}),
+            "an empty argument is rejected by the server, so it is not sent"
+        );
+    }
+
+    fn bridge() -> ConnectorConfig {
+        ConnectorConfig {
+            project: "abc".into(),
+            mcp_dialect: "bridge".into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn the_bridge_takes_a_list_of_nodes_to_screenshot() {
+        let hint = mcp_hint(&bridge(), "image", "1:2", 0, "3").unwrap();
+
+        assert_eq!(
+            hint.arguments,
+            json!({"nodeIds": ["1:2"], "scale": 3.0, "fileKey": "abc"})
+        );
+    }
+
+    #[test]
+    fn the_bridge_reads_its_other_tools_off_the_selection() {
+        for verb in ["file", "node"] {
+            let hint = mcp_hint(&bridge(), verb, "1:2", 5, "2").unwrap();
+
+            assert_eq!(
+                hint.arguments,
+                json!({"depth": 5, "fileKey": "abc"}),
+                "{verb} names no node on the bridge"
+            );
+        }
+
+        let hint = mcp_hint(&bridge(), "variables", "1:2", 0, "2").unwrap();
+
+        assert_eq!(
+            hint.arguments,
+            json!({"fileKey": "abc"}),
+            "variables takes neither a node nor a depth"
+        );
+    }
+
+    #[test]
+    fn the_hosted_dialect_takes_neither_depth_nor_scale() {
+        let config = ConnectorConfig {
+            project: "abc".into(),
+            ..Default::default()
+        };
+
+        let hint = mcp_hint(&config, "image", "1:2", 5, "3").unwrap();
+
+        assert_eq!(
+            hint.arguments,
+            json!({"nodeId": "1:2", "fileKey": "abc"}),
+            "the hosted server declares maxDimension, which --scale is not"
+        );
+    }
+
+    #[test]
+    fn a_scale_that_is_not_a_number_is_rejected() {
+        let error = mcp_hint(&bridge(), "image", "1:2", 0, "2x")
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("--scale '2x' is not a number"), "{error}");
+    }
+
+    #[test]
+    fn an_unknown_dialect_is_rejected() {
+        let config = ConnectorConfig {
+            mcp_dialect: "sketch".into(),
+            ..Default::default()
+        };
+
+        let error = mcp_hint(&config, "file", "1:2", 3, "2")
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("use figma or bridge"), "{error}");
+    }
+
+    #[test]
+    fn a_bare_key_is_left_alone() {
+        assert_eq!(file_key("AbC123XyZ890").unwrap(), "AbC123XyZ890");
+    }
+
+    #[test]
+    fn a_link_yields_its_key() {
+        let key = file_key("https://www.figma.com/design/AbC123XyZ890/Checkout-Flow").unwrap();
+
+        assert_eq!(key, "AbC123XyZ890");
+    }
+
+    #[test]
+    fn a_key_is_read_before_the_query_string() {
+        let key = file_key("https://www.figma.com/design/AbC123XyZ890?node-id=1-2").unwrap();
+
+        assert_eq!(key, "AbC123XyZ890");
+    }
+
+    #[test]
+    fn every_editor_puts_the_key_in_the_same_place() {
+        for editor in ["design", "file", "board", "slides", "proto"] {
+            let link = format!("https://www.figma.com/{editor}/AbC123XyZ890/Name");
+
+            assert_eq!(file_key(&link).unwrap(), "AbC123XyZ890", "{editor}");
+        }
+    }
+
+    #[test]
+    fn a_link_without_a_key_is_rejected() {
+        let error = file_key("https://www.figma.com/design/")
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("figma.com/design/<key>"), "{error}");
     }
 }

@@ -202,20 +202,33 @@ enum DesignCommand {
     File {
         #[arg(long, default_value_t = 3)]
         depth: usize,
+        /// File key or link, overriding the configured one.
+        #[arg(long, default_value = "")]
+        file: String,
     },
     /// Distilled structure of one node.
     Node {
         node: String,
         #[arg(long, default_value_t = 5)]
         depth: usize,
+        /// File key or link, overriding the configured one.
+        #[arg(long, default_value = "")]
+        file: String,
     },
     /// Design tokens behind colours, spacing, and typography.
-    Variables,
+    Variables {
+        /// File key or link, overriding the configured one.
+        #[arg(long, default_value = "")]
+        file: String,
+    },
     /// Rendered frame URLs for the agent to look at.
     Image {
         node: String,
         #[arg(long, default_value = "2")]
         scale: String,
+        /// File key or link, overriding the configured one.
+        #[arg(long, default_value = "")]
+        file: String,
     },
     /// Line design component names up against the indexed code components.
     Map {
@@ -375,21 +388,21 @@ fn dispatch(command: &Command) -> (&'static str, Result<bool>) {
             commands::connect::connect(system, verb, args).map(|_| true),
         ),
         Command::Design { command } => match command {
-            DesignCommand::File { depth } => (
+            DesignCommand::File { depth, file } => (
                 "design",
-                commands::design::design("file", "", *depth, "2").map(|_| true),
+                commands::design::design("file", "", *depth, "2", file).map(|_| true),
             ),
-            DesignCommand::Node { node, depth } => (
+            DesignCommand::Node { node, depth, file } => (
                 "design",
-                commands::design::design("node", node, *depth, "2").map(|_| true),
+                commands::design::design("node", node, *depth, "2", file).map(|_| true),
             ),
-            DesignCommand::Variables => (
+            DesignCommand::Variables { file } => (
                 "design",
-                commands::design::design("variables", "", 0, "2").map(|_| true),
+                commands::design::design("variables", "", 0, "2", file).map(|_| true),
             ),
-            DesignCommand::Image { node, scale } => (
+            DesignCommand::Image { node, scale, file } => (
                 "design",
-                commands::design::design("image", node, 0, scale).map(|_| true),
+                commands::design::design("image", node, 0, scale, file).map(|_| true),
             ),
             DesignCommand::Map { names, budget } => (
                 "design.map",

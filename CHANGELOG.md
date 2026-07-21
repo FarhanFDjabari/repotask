@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.2.4 - 2026-07-21
+
+### `design` reads any file, not only the configured one
+
+`connectors.figma.project` names the project's own design file, so reading anything
+else meant editing the config. `design file`, `node`, `variables`, and `image` now take
+`--file`, which accepts a bare file key or a pasted link — the key sits in the same
+position for every editor, so `figma.com/design/<key>/<name>` and its `/file/`,
+`/board/`, `/slides/`, and `/proto/` siblings all work. A link that carries no key is
+rejected rather than turned into a malformed URL.
+
+The file also reaches the MCP fallback, which previously named no file at all and so
+read whichever one the user had open. The hint now carries `fileKey`, the argument name
+both the hosted server and the desktop bridge use. Arguments without a value are left
+out instead of sent blank: `design file` had been emitting `"nodeId": ""`, which both
+servers reject.
+
+### The MCP hint matches the server it is addressed to
+
+Servers exposing the same Figma tools disagree on their arguments: the hosted server
+takes a single `nodeId` everywhere, while a desktop bridge reads the current selection
+and names nodes only on `get_screenshot`, as a list. A hint carrying an argument the
+server does not declare is rejected outright, costing the agent the call and a retry —
+which is what the fallback exists to avoid.
+
+`connectors.figma.mcp_dialect` picks the shape: `figma` (the default) or `bridge`. The
+CLI never connects to an MCP server, so it cannot discover the dialect and has to be
+told; an unrecognized one is an error rather than a silent default.
+
+`--depth` and `--scale` reach the bridge too, which declares both — they had been
+dropped on the MCP path, so a hint rendered at the server's default rather than what
+was asked for. The hosted server's nearest equivalent to `--scale` is `maxDimension`, a
+pixel cap rather than a multiplier, so that dialect still sends neither. A `--scale`
+that is not a number is now rejected before the hint is built.
+
 ## 0.2.3 - 2026-07-21
 
 ### SwiftUI views and components are indexed
