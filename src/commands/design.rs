@@ -48,7 +48,7 @@ pub fn design(verb: &str, node: &str, depth: usize, scale: &str, file: &str) -> 
     let structure = match attempt {
         fallback::Attempt::Rest(value) => value,
         fallback::Attempt::FallBack(reason) => {
-            let request = figma::mcp_hint(&settings, verb, node);
+            let request = figma::mcp_hint(&settings, verb, node)?;
             output::warn(format!("Falling back to an MCP call: {reason}"));
             let data = json!({
                 "verb": verb,

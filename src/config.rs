@@ -166,6 +166,11 @@ pub struct ConnectorConfig {
     pub project: String,
     #[serde(default)]
     pub mcp_server: String,
+    /// Which server's argument names the MCP hint should use. Servers exposing the
+    /// same tool disagree on its arguments, and the CLI never connects to one, so it
+    /// cannot discover the shape and has to be told.
+    #[serde(default = "default_dialect")]
+    pub mcp_dialect: String,
     /// Header name carrying the credential, when the system is config-declared.
     #[serde(default)]
     pub auth_header: String,
@@ -183,6 +188,7 @@ impl Default for ConnectorConfig {
             base_url: String::new(),
             project: String::new(),
             mcp_server: String::new(),
+            mcp_dialect: default_dialect(),
             auth_header: String::new(),
             auth_format: String::new(),
             verbs: BTreeMap::new(),
@@ -203,6 +209,11 @@ impl ConnectorConfig {
 /// REST first: the CLI fetches and distils, so the agent only pays for the result.
 fn default_mode() -> String {
     "auto".into()
+}
+
+/// The hosted server is the one most agents are already connected to.
+fn default_dialect() -> String {
+    "figma".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

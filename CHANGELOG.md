@@ -17,6 +17,18 @@ both the hosted server and the desktop bridge use. Arguments without a value are
 out instead of sent blank: `design file` had been emitting `"nodeId": ""`, which both
 servers reject.
 
+### The MCP hint matches the server it is addressed to
+
+Servers exposing the same Figma tools disagree on their arguments: the hosted server
+takes a single `nodeId` everywhere, while a desktop bridge reads the current selection
+and names nodes only on `get_screenshot`, as a list. A hint carrying an argument the
+server does not declare is rejected outright, costing the agent the call and a retry —
+which is what the fallback exists to avoid.
+
+`connectors.figma.mcp_dialect` picks the shape: `figma` (the default) or `bridge`. The
+CLI never connects to an MCP server, so it cannot discover the dialect and has to be
+told; an unrecognized one is an error rather than a silent default.
+
 ## 0.2.3 - 2026-07-21
 
 ### SwiftUI views and components are indexed
