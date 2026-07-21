@@ -5,7 +5,7 @@ use serde_json::Value;
 
 const SWIFT_SOURCE: &str =
     "import Foundation\n\nclass FeedViewModel: ObservableObject {\n    func load() {}\n}\n";
-const SWIFTUI_SOURCE: &str = "import SwiftUI\n\nstruct ContentView: View {\n    var body: some View { Text(\"hi\") }\n}\n\nclass FeedViewModel: ObservableObject {}\n\nactor FeedCache {}\n\nenum Route { case home }\n";
+const SWIFTUI_SOURCE: &str = "import SwiftUI\n\nstruct ContentView: View {\n    var body: some View { Text(\"hi\") }\n}\n\nclass FeedViewModel: ObservableObject {}\n\nactor FeedCache {}\n\nenum Route { case home }\n\nextension View {\n    func styled() -> some View { self }\n}\n";
 const PYTHON_SOURCE: &str =
     "class Loader:\n    def load(self) -> None:\n        pass\n\n\ndef helper() -> int:\n    return 1\n";
 
@@ -70,6 +70,9 @@ fn swift_structs_are_indexed_distinctly_from_classes() {
     assert!(found.contains(&("FeedViewModel".into(), "class".into())));
     assert!(found.contains(&("FeedCache".into(), "actor".into())));
     assert!(found.contains(&("Route".into(), "enum".into())));
+    // An extension is not a declaration; it must not appear as a phantom `View`.
+    assert!(!found.iter().any(|(name, _)| name == "View"));
+    assert!(found.contains(&("styled".into(), "function".into())));
 }
 
 #[test]
