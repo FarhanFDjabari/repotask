@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.4 - 2026-07-21
+
+### `design` reads any file, not only the configured one
+
+`connectors.figma.project` names the project's own design file, so reading anything
+else meant editing the config. `design file`, `node`, `variables`, and `image` now take
+`--file`, which accepts a bare file key or a pasted link — the key sits in the same
+position for every editor, so `figma.com/design/<key>/<name>` and its `/file/`,
+`/board/`, `/slides/`, and `/proto/` siblings all work. A link that carries no key is
+rejected rather than turned into a malformed URL.
+
+The file also reaches the MCP fallback, which previously named no file at all and so
+read whichever one the user had open. The hint now carries `fileKey`, the argument name
+both the hosted server and the desktop bridge use. Arguments without a value are left
+out instead of sent blank: `design file` had been emitting `"nodeId": ""`, which both
+servers reject.
+
 ## 0.2.3 - 2026-07-21
 
 ### SwiftUI views and components are indexed

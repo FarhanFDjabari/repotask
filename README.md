@@ -221,6 +221,17 @@ No code found for: Checkout/PaymentSheet
 Configure it with the Figma file key as `project`, and a token in `REPOTASK_FIGMA_TOKEN`. Without a
 token it falls back to the Figma MCP server, which already holds the user's session.
 
+`project` names the project's own design file. To read any other file you have access to, pass
+`--file` with its key or a pasted link:
+
+```bash
+repo-task design file --file https://www.figma.com/design/AbC123XyZ890/Checkout-Flow
+repo-task design node 1:2 --file AbC123XyZ890
+```
+
+The file carries into the MCP fallback as `fileKey`, so the agent reads the file you asked for
+rather than whichever one is open.
+
 ## Agent skills
 
 `repo-task skills sync` writes thin skills that reference commands and contain **no** project
