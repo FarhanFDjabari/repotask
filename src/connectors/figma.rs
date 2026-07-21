@@ -234,8 +234,8 @@ fn component_summary(components: &Value) -> Vec<Value> {
 ///
 /// The hosted server takes a single `nodeId` on every tool. The desktop bridge reads
 /// the current selection instead, so only its screenshot tool names nodes, and it takes
-/// a list. A hint carrying an argument the server does not declare is rejected outright,
-/// which costs the agent the call and a retry — the fallback is meant to save.
+/// a list. An undeclared argument is ignored rather than refused, so naming the node the
+/// wrong way does not fail — it reads the selection, which is whatever was last clicked.
 fn node_argument(dialect: &str, tool: &str, node_id: &str) -> Option<(String, Value)> {
     if node_id.is_empty() {
         return None;

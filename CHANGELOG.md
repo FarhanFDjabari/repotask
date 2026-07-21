@@ -14,16 +14,18 @@ rejected rather than turned into a malformed URL.
 The file also reaches the MCP fallback, which previously named no file at all and so
 read whichever one the user had open. The hint now carries `fileKey`, the argument name
 both the hosted server and the desktop bridge use. Arguments without a value are left
-out instead of sent blank: `design file` had been emitting `"nodeId": ""`, which both
-servers reject.
+out instead of sent blank: `design file` had been emitting `"nodeId": ""`, which every
+server declaring that argument declares non-empty.
 
 ### The MCP hint matches the server it is addressed to
 
 Servers exposing the same Figma tools disagree on their arguments: the hosted server
 takes a single `nodeId` everywhere, while a desktop bridge reads the current selection
-and names nodes only on `get_screenshot`, as a list. A hint carrying an argument the
-server does not declare is rejected outright, costing the agent the call and a retry —
-which is what the fallback exists to avoid.
+and names nodes only on `get_screenshot`, as a list. An argument the server does not
+declare is not refused — it is ignored, so the call succeeds against the wrong target.
+Sending `nodeId` to the bridge left `nodeIds` unset, and a screenshot with no `nodeIds`
+exports the current selection: whatever the user last clicked, rather than the node that
+was asked for.
 
 `connectors.figma.mcp_dialect` picks the shape: `figma` (the default) or `bridge`. The
 CLI never connects to an MCP server, so it cannot discover the dialect and has to be
