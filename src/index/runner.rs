@@ -202,17 +202,19 @@ fn extract(parser: &mut Parser, language: &str, source: &[u8], relative: &str) -
 }
 
 /// Swift folds `struct`, `class`, `actor`, and `enum` into a single
-/// `class_declaration`; the leading keyword is what distinguishes them. Split
-/// out `struct` so SwiftUI views and components can be targeted precisely.
-/// Other keywords keep the mapped kind.
+/// `class_declaration`; the leading keyword is what distinguishes them. Report
+/// each keyword as its own kind so families can target them precisely.
+/// `extension` and anything else keep the mapped kind.
 fn refine_kind<'a>(language: &str, node: &Node, kind: &'a str) -> &'a str {
     if language == "swift" && node.kind() == "class_declaration" {
         let mut cursor = node.walk();
-        if node
-            .children(&mut cursor)
-            .any(|child| child.kind() == "struct")
-        {
-            return "struct";
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "struct" => return "struct",
+                "actor" => return "actor",
+                "enum" => return "enum",
+                _ => {}
+            }
         }
     }
     kind

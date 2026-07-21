@@ -8,9 +8,10 @@ Swift's grammar folds `struct`, `class`, `actor`, and `enum` into one
 `class_declaration` node, so every Swift type was recorded as a `class`. SwiftUI
 views and components are structs, which left them indistinguishable from reference
 types and kept the `components` family (declared over other stacks) from reaching
-them. The extractor now reads the leading keyword and labels a `struct` as such, and
-the `components`, `screens`, `viewmodels`, `repositories`, and `usecases` families
-declare the `swiftui` stack and accept `struct` where they already accepted `class`.
+them. The extractor now reads the leading keyword and reports `struct`, `actor`, and
+`enum` as their own kinds. The `components`, `screens`, `viewmodels`, `repositories`,
+and `usecases` families declare the `swiftui` stack and accept the new kinds where
+they already accepted `class`.
 
 ## 0.2.2 - 2026-07-21
 

@@ -11,13 +11,13 @@ fact_families:
   - name: viewmodels
     description: Presentation-layer state holders
     stacks: [android, kotlin, ios, swift, swiftui]
-    kinds: [class, struct]
+    kinds: [class, struct, actor, enum]
     name_pattern: ".*(ViewModel|Presenter)$"
 
   - name: repositories
     description: Data-access entry points
     stacks: [android, kotlin, ios, swift, swiftui, flutter, dart, typescript]
-    kinds: [class, struct, interface, protocol]
+    kinds: [class, struct, actor, enum, interface, protocol]
     name_pattern: ".*(Repository|Repo|DataSource)$"
 
   - name: screens
@@ -28,7 +28,7 @@ fact_families:
   - name: usecases
     description: Domain operations
     stacks: [android, kotlin, ios, swift, swiftui, flutter, dart]
-    kinds: [class, struct, interface, protocol]
+    kinds: [class, struct, actor, enum, interface, protocol]
     name_pattern: ".*(UseCase|Interactor)$"
 
   - name: components
