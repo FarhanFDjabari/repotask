@@ -247,7 +247,31 @@ fn node_argument(dialect: &str, tool: &str, node_id: &str) -> Option<(String, Va
     }
 }
 
-pub fn mcp_hint(config: &ConnectorConfig, verb: &str, node_id: &str) -> Result<McpRequest> {
+/// Carry the flags the caller already gave the CLI, where the server declares them.
+///
+/// Only the bridge does: it takes `depth` when walking the tree and `scale` when
+/// rendering. The hosted server's nearest equivalent is `maxDimension`, a pixel cap
+/// rather than a multiplier, so `--scale` cannot be handed to it unchanged.
+fn tuning(tool: &str, depth: usize, scale: &str) -> Result<Vec<(String, Value)>> {
+    match tool {
+        "get_design_context" => Ok(vec![("depth".into(), json!(depth))]),
+        "get_screenshot" => {
+            let Ok(parsed) = scale.parse::<f64>() else {
+                bail!("--scale '{scale}' is not a number.");
+            };
+            Ok(vec![("scale".into(), json!(parsed))])
+        }
+        _ => Ok(Vec::new()),
+    }
+}
+
+pub fn mcp_hint(
+    config: &ConnectorConfig,
+    verb: &str,
+    node_id: &str,
+    depth: usize,
+    scale: &str,
+) -> Result<McpRequest> {
     let dialect = config.mcp_dialect.as_str();
     if !["figma", "bridge"].contains(&dialect) {
         bail!("Connector 'figma' has mcp_dialect '{dialect}'; use figma or bridge.");
@@ -269,6 +293,11 @@ pub fn mcp_hint(config: &ConnectorConfig, verb: &str, node_id: &str) -> Result<M
     let mut arguments = Map::new();
     if let Some((name, value)) = node_argument(dialect, tool, node_id) {
         arguments.insert(name, value);
+    }
+    if dialect == "bridge" {
+        for (name, value) in tuning(tool, depth, scale)? {
+            arguments.insert(name, value);
+        }
     }
     if !config.project.is_empty() {
         arguments.insert("fileKey".into(), json!(config.project));
@@ -388,15 +417,15 @@ mod tests {
         };
 
         assert_eq!(
-            mcp_hint(&config, "image", "1:2").unwrap().tool,
+            mcp_hint(&config, "image", "1:2", 0, "2").unwrap().tool,
             "get_screenshot"
         );
         assert_eq!(
-            mcp_hint(&config, "variables", "1:2").unwrap().tool,
+            mcp_hint(&config, "variables", "1:2", 0, "2").unwrap().tool,
             "get_variable_defs"
         );
         assert_eq!(
-            mcp_hint(&config, "file", "1:2").unwrap().tool,
+            mcp_hint(&config, "file", "1:2", 3, "2").unwrap().tool,
             "get_design_context"
         );
     }
@@ -408,7 +437,7 @@ mod tests {
             ..Default::default()
         };
 
-        let hint = mcp_hint(&config, "node", "1:2").unwrap();
+        let hint = mcp_hint(&config, "node", "1:2", 5, "2").unwrap();
 
         assert_eq!(hint.arguments["fileKey"], "abc");
         assert_eq!(hint.arguments["nodeId"], "1:2");
@@ -416,7 +445,7 @@ mod tests {
 
     #[test]
     fn mcp_hints_omit_arguments_that_have_no_value() {
-        let hint = mcp_hint(&ConnectorConfig::default(), "file", "").unwrap();
+        let hint = mcp_hint(&ConnectorConfig::default(), "file", "", 3, "2").unwrap();
 
         assert_eq!(
             hint.arguments,
@@ -435,24 +464,58 @@ mod tests {
 
     #[test]
     fn the_bridge_takes_a_list_of_nodes_to_screenshot() {
-        let hint = mcp_hint(&bridge(), "image", "1:2").unwrap();
+        let hint = mcp_hint(&bridge(), "image", "1:2", 0, "3").unwrap();
 
-        assert_eq!(hint.arguments["nodeIds"], json!(["1:2"]));
-        assert_eq!(hint.arguments["fileKey"], "abc");
-        assert!(hint.arguments.get("nodeId").is_none());
+        assert_eq!(
+            hint.arguments,
+            json!({"nodeIds": ["1:2"], "scale": 3.0, "fileKey": "abc"})
+        );
     }
 
     #[test]
     fn the_bridge_reads_its_other_tools_off_the_selection() {
-        for verb in ["file", "node", "variables"] {
-            let hint = mcp_hint(&bridge(), verb, "1:2").unwrap();
+        for verb in ["file", "node"] {
+            let hint = mcp_hint(&bridge(), verb, "1:2", 5, "2").unwrap();
 
             assert_eq!(
                 hint.arguments,
-                json!({"fileKey": "abc"}),
+                json!({"depth": 5, "fileKey": "abc"}),
                 "{verb} names no node on the bridge"
             );
         }
+
+        let hint = mcp_hint(&bridge(), "variables", "1:2", 0, "2").unwrap();
+
+        assert_eq!(
+            hint.arguments,
+            json!({"fileKey": "abc"}),
+            "variables takes neither a node nor a depth"
+        );
+    }
+
+    #[test]
+    fn the_hosted_dialect_takes_neither_depth_nor_scale() {
+        let config = ConnectorConfig {
+            project: "abc".into(),
+            ..Default::default()
+        };
+
+        let hint = mcp_hint(&config, "image", "1:2", 5, "3").unwrap();
+
+        assert_eq!(
+            hint.arguments,
+            json!({"nodeId": "1:2", "fileKey": "abc"}),
+            "the hosted server declares maxDimension, which --scale is not"
+        );
+    }
+
+    #[test]
+    fn a_scale_that_is_not_a_number_is_rejected() {
+        let error = mcp_hint(&bridge(), "image", "1:2", 0, "2x")
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("--scale '2x' is not a number"), "{error}");
     }
 
     #[test]
@@ -462,7 +525,9 @@ mod tests {
             ..Default::default()
         };
 
-        let error = mcp_hint(&config, "file", "1:2").unwrap_err().to_string();
+        let error = mcp_hint(&config, "file", "1:2", 3, "2")
+            .unwrap_err()
+            .to_string();
 
         assert!(error.contains("use figma or bridge"), "{error}");
     }

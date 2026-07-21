@@ -234,7 +234,7 @@ rather than whichever one is open.
 
 Servers expose the same tools under different arguments, and the CLI never connects to one, so it
 cannot discover which. `mcp_dialect` tells it: `figma` (default) for the hosted server, `bridge`
-for a desktop bridge that reads the current selection.
+for a desktop bridge that reads the current selection and takes `--depth` and `--scale`.
 
 ```yaml
 connectors:

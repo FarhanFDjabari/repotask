@@ -29,6 +29,12 @@ which is what the fallback exists to avoid.
 CLI never connects to an MCP server, so it cannot discover the dialect and has to be
 told; an unrecognized one is an error rather than a silent default.
 
+`--depth` and `--scale` reach the bridge too, which declares both — they had been
+dropped on the MCP path, so a hint rendered at the server's default rather than what
+was asked for. The hosted server's nearest equivalent to `--scale` is `maxDimension`, a
+pixel cap rather than a multiplier, so that dialect still sends neither. A `--scale`
+that is not a number is now rejected before the hint is built.
+
 ## 0.2.3 - 2026-07-21
 
 ### SwiftUI views and components are indexed
