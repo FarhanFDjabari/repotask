@@ -2,6 +2,23 @@
 
 ## 0.2.4 - 2026-07-21
 
+### MCP-only connectors are first class
+
+A verb reachable only over MCP had to declare a `path` it would never call, so the
+config carried a fake REST route to satisfy the schema — and `doctor` failed without
+one. `path` is now optional: a verb declares `path` for a REST call, `mcp_tool` for one
+the agent runs, and the config is rejected only when it declares neither. `mode: rest`
+still requires a `path`, because there is nothing else for it to call.
+
+`fetch` no longer stops at the four built-in drivers. A connector that declares a
+`fetch` verb answers `repo-task fetch --system <name>`, and is picked automatically when
+it is the only one configured; the ticket reaches the verb as `identifier`.
+
+An MCP-mode connector no longer reports `REST call unavailable`. Nothing was attempted,
+so the envelope states `"mode": "mcp"` with the reason `Connector configured for MCP
+execution` and raises no fallback warning — the warning is for the case where the CLI
+tried and could not.
+
 ### `design` reads any file, not only the configured one
 
 `connectors.figma.project` names the project's own design file, so reading anything

@@ -10,7 +10,7 @@ use serde_json::{json, Map, Value};
 
 use crate::config::{ConnectorConfig, VerbConfig};
 use crate::connectors::rest::{base_url, get_json};
-use crate::connectors::{secrets, McpRequest};
+use crate::connectors::{fallback, secrets, McpRequest};
 
 /// Fill `{name}` placeholders from `--arg name=value`, percent-encoding each value so
 /// a caller cannot smuggle a path segment or query string into the URL.
@@ -167,6 +167,51 @@ pub fn mcp_request(
         tool: verb.mcp_tool.clone(),
         arguments: Value::Object(args.clone()),
         reason: format!("Run '{verb_name}' on {system} through your own connection."),
+    })
+}
+
+/// What running a declared verb produced.
+pub enum Outcome {
+    /// The CLI made the call; this is the projected response.
+    Rest(Value),
+    /// The agent has to make the call. `attempted_rest` separates a real fallback —
+    /// the CLI tried and could not — from an MCP-only verb, which was never going to
+    /// be a REST call and so is a result rather than a degradation.
+    Mcp {
+        request: McpRequest,
+        reason: String,
+        attempted_rest: bool,
+    },
+}
+
+/// Run a config-declared verb, REST first where the verb declares a `path`.
+pub fn run(
+    system: &str,
+    config: &ConnectorConfig,
+    verb_name: &str,
+    verb: &VerbConfig,
+    args: &Map<String, Value>,
+) -> Result<Outcome> {
+    let attempted_rest = config.allows_rest() && !verb.path.is_empty();
+    let attempt = if attempted_rest {
+        // Build before attempting: an unfilled placeholder is the caller's mistake, and
+        // retrying it through the agent would send the same incomplete arguments.
+        let request = build(system, config, verb, args)?;
+        fallback::attempt(true, config.allows_mcp(), || {
+            send(system, config, verb, &request)
+        })?
+    } else if config.allows_rest() {
+        fallback::Attempt::FallBack(format!("Verb '{verb_name}' declares no REST path"))
+    } else {
+        fallback::Attempt::FallBack("Connector configured for MCP execution".into())
+    };
+    Ok(match attempt {
+        fallback::Attempt::Rest(result) => Outcome::Rest(result),
+        fallback::Attempt::FallBack(reason) => Outcome::Mcp {
+            request: mcp_request(system, config, verb_name, verb, args)?,
+            reason,
+            attempted_rest,
+        },
     })
 }
 

@@ -90,6 +90,12 @@ pub const CONNECTOR_NAMES: &[&str] = &["jira", "github", "gitlab", "clickup"];
 /// Systems reachable outside the ticket-shaped `Connector` trait.
 pub const OTHER_SYSTEMS: &[&str] = &["figma"];
 
+/// The verb `repo-task fetch` runs on a config-declared system.
+pub const FETCH_VERB: &str = "fetch";
+
+/// The argument `repo-task fetch` passes the ticket in as on a declared system.
+pub const FETCH_ARG: &str = "identifier";
+
 pub fn get(system: &str) -> Result<Box<dyn Connector>> {
     Ok(match system {
         "jira" => Box::new(providers::Jira),
@@ -122,16 +128,26 @@ pub fn connector_config(config: &RepoTaskConfig, system: &str) -> Result<Connect
     Ok(settings.clone())
 }
 
-/// The single enabled connector, when the user has not named one.
+/// The single enabled built-in connector, when the user has not named one.
 pub fn default_system(config: &RepoTaskConfig) -> Result<String> {
-    // Only ticket-shaped systems can answer `fetch`; a design or declared system
-    // being configured must not make the choice ambiguous.
+    // Only ticket-shaped systems can answer; a design or declared system being
+    // configured must not make the choice ambiguous.
+    single_enabled(config, |name, _| CONNECTOR_NAMES.contains(&name))
+}
+
+/// The single enabled system `fetch` can reach, which includes declared connectors.
+pub fn default_fetch_system(config: &RepoTaskConfig) -> Result<String> {
+    single_enabled(config, can_fetch)
+}
+
+fn single_enabled(
+    config: &RepoTaskConfig,
+    usable: impl Fn(&str, &ConnectorConfig) -> bool,
+) -> Result<String> {
     let mut enabled: Vec<&String> = config
         .connectors
         .iter()
-        .filter(|(name, settings)| {
-            settings.mode != "off" && CONNECTOR_NAMES.contains(&name.as_str())
-        })
+        .filter(|(name, settings)| settings.mode != "off" && usable(name, settings))
         .map(|(name, _)| name)
         .collect();
     enabled.sort();
@@ -148,6 +164,11 @@ pub fn default_system(config: &RepoTaskConfig) -> Result<String> {
             )
         }
     }
+}
+
+/// Whether `fetch` can reach this system: a built-in driver, or a declared `fetch` verb.
+pub fn can_fetch(system: &str, settings: &ConnectorConfig) -> bool {
+    CONNECTOR_NAMES.contains(&system) || settings.verbs.contains_key(FETCH_VERB)
 }
 
 pub fn mcp_json(request: &McpRequest) -> Value {

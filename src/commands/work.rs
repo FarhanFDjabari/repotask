@@ -6,10 +6,11 @@
 use std::io::Read;
 
 use anyhow::{bail, Result};
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use crate::config;
-use crate::connectors::{self, fallback, mcp_json};
+use crate::config::ConnectorConfig;
+use crate::connectors::{self, declared, fallback, mcp_json};
 use crate::index::families::SYMBOLS_FAMILY;
 use crate::kb;
 use crate::kb::slicing::build_pack;
@@ -75,11 +76,14 @@ pub fn fetch(ticket: &str, system: &str, write: &str) -> Result<()> {
     }
 
     let name = if system.is_empty() {
-        connectors::default_system(&config)?
+        connectors::default_fetch_system(&config)?
     } else {
         system.to_string()
     };
     let settings = connectors::connector_config(&config, &name)?;
+    if !connectors::CONNECTOR_NAMES.contains(&name.as_str()) {
+        return declared_fetch(&name, &settings, ticket, &item);
+    }
     let connector = connectors::get(&name)?;
 
     // REST first: the CLI fetches and stores the ticket, so the agent never pays
@@ -92,7 +96,10 @@ pub fn fetch(ticket: &str, system: &str, write: &str) -> Result<()> {
         fallback::Attempt::Rest(ticket_data) => ticket_data,
         fallback::Attempt::FallBack(reason) => {
             let request = connector.mcp_fetch(&settings, ticket)?;
-            output::warn(format!("Falling back to an MCP call: {reason}"));
+            // `mcp` mode never attempted a REST call, so there is nothing to warn about.
+            if settings.allows_rest() {
+                output::warn(format!("Falling back to an MCP call: {reason}"));
+            }
             let data = json!({
                 "ticket": ticket,
                 "mode": "mcp",
@@ -129,6 +136,81 @@ pub fn fetch(ticket: &str, system: &str, write: &str) -> Result<()> {
             value["stored"].as_str().unwrap_or("")
         )
     });
+    Ok(())
+}
+
+/// Fetch through a config-declared connector — one with no built-in driver, reached
+/// by the `fetch` verb the project declared for it.
+fn declared_fetch(
+    system: &str,
+    settings: &ConnectorConfig,
+    ticket: &str,
+    item: &store::WorkItem,
+) -> Result<()> {
+    let Some(verb) = settings.verbs.get(connectors::FETCH_VERB) else {
+        bail!(
+            "'{system}' has no built-in driver and declares no '{}' verb. Add one under \
+             `connectors.{system}.verbs` in .repo-task/config.yaml, or pass --system with one of: \
+             {}.",
+            connectors::FETCH_VERB,
+            connectors::CONNECTOR_NAMES.join(", ")
+        );
+    };
+    let arguments: Map<String, Value> = [(connectors::FETCH_ARG.to_string(), json!(ticket))]
+        .into_iter()
+        .collect();
+
+    match declared::run(system, settings, connectors::FETCH_VERB, verb, &arguments)? {
+        declared::Outcome::Rest(result) => {
+            // A declared verb returns whatever the system's API returns, so there is no
+            // ticket shape to normalize to; store the projected payload as it came.
+            let content = serde_json::to_string_pretty(&result)?;
+            let stored = item.write(store::SOURCE, &content)?;
+            item.touch_meta(&[("source", json!(system))])?;
+            let data = json!({
+                "ticket": ticket,
+                "system": system,
+                "mode": "rest",
+                "stored": stored,
+                "result": result,
+            });
+            output::emit("fetch", &data, |value| {
+                format!(
+                    "Fetched {} -> {}",
+                    value["ticket"].as_str().unwrap_or(""),
+                    value["stored"].as_str().unwrap_or(""),
+                )
+            });
+        }
+        declared::Outcome::Mcp {
+            request,
+            reason,
+            attempted_rest,
+        } => {
+            if attempted_rest {
+                output::warn(format!("Falling back to an MCP call: {reason}"));
+            }
+            let data = json!({
+                "ticket": ticket,
+                "system": system,
+                "mode": "mcp",
+                "reason": reason,
+                "request": mcp_json(&request),
+                "nextStep": format!("repo-task fetch {ticket} --write -"),
+                "instruction": "Call the tool above yourself, then pipe the ticket text back \
+                                into the next step so later commands can use it.",
+            });
+            output::emit("fetch", &data, |value| {
+                format!(
+                    "Call {}.{} with {}, then run: {}",
+                    value["request"]["server"].as_str().unwrap_or(""),
+                    value["request"]["tool"].as_str().unwrap_or(""),
+                    value["request"]["arguments"],
+                    value["nextStep"].as_str().unwrap_or(""),
+                )
+            });
+        }
+    }
     Ok(())
 }
 

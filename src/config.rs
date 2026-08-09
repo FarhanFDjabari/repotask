@@ -140,7 +140,9 @@ impl Default for BriefConfig {
 #[serde(deny_unknown_fields)]
 pub struct VerbConfig {
     /// Path appended to the connector's `base_url`. `{name}` placeholders are filled
-    /// from `--arg name=value` and percent-encoded.
+    /// from `--arg name=value` and percent-encoded. Omitted by a verb that only exists
+    /// over MCP, which declares `mcp_tool` instead.
+    #[serde(default)]
     pub path: String,
     #[serde(default)]
     pub query: BTreeMap<String, String>,
@@ -272,6 +274,23 @@ impl RepoTaskConfig {
                 "Invalid configuration field 'knowledge.remote': {}",
                 self.knowledge.remote
             );
+        }
+        for (system, connector) in &self.connectors {
+            for (verb, settings) in &connector.verbs {
+                if !settings.path.is_empty() {
+                    continue;
+                }
+                let field = format!("connectors.{system}.verbs.{verb}");
+                if settings.mcp_tool.is_empty() {
+                    bail!(
+                        "Invalid configuration field '{field}': declare `path` for a REST call, \
+                         or `mcp_tool` for one the agent runs over MCP"
+                    );
+                }
+                if connector.mode == "rest" {
+                    bail!("Invalid configuration field '{field}': mode 'rest' needs a `path`");
+                }
+            }
         }
         Ok(())
     }
