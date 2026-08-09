@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 use serde_json::json;
 
 use crate::config;
-use crate::connectors::{connector_config, declared, fallback, mcp_json, OTHER_SYSTEMS};
+use crate::connectors::{connector_config, declared, mcp_json, OTHER_SYSTEMS};
 use crate::output;
 
 pub fn connect(system: &str, verb_name: &str, args: &[String]) -> Result<()> {
@@ -65,16 +65,9 @@ pub fn connect(system: &str, verb_name: &str, args: &[String]) -> Result<()> {
         );
     };
     let arguments = declared::parse_args(args)?;
-    // Build before attempting: an unfilled placeholder is the caller's mistake, and
-    // retrying it through the agent would send the same incomplete arguments.
-    let request = declared::build(system, &settings, verb, &arguments)?;
 
-    let attempt = fallback::attempt(settings.allows_rest(), settings.allows_mcp(), || {
-        declared::send(system, &settings, verb, &request)
-    })?;
-
-    match attempt {
-        fallback::Attempt::Rest(result) => {
+    match declared::run(system, &settings, verb_name, verb, &arguments)? {
+        declared::Outcome::Rest(result) => {
             let data = json!({
                 "system": system,
                 "verb": verb_name,
@@ -86,17 +79,25 @@ pub fn connect(system: &str, verb_name: &str, args: &[String]) -> Result<()> {
                 serde_json::to_string_pretty(&value["result"]).unwrap_or_default()
             });
         }
-        fallback::Attempt::FallBack(reason) => {
-            let request = declared::mcp_request(system, &settings, verb_name, verb, &arguments)?;
-            output::warn(format!("Falling back to an MCP call: {reason}"));
+        declared::Outcome::Mcp {
+            request,
+            reason,
+            attempted_rest,
+        } => {
+            let instruction = if attempted_rest {
+                output::warn(format!("Falling back to an MCP call: {reason}"));
+                "Call the tool above through your own connection. The CLI could not make the \
+                 REST call itself."
+            } else {
+                "Call the tool above through your own connection."
+            };
             let data = json!({
                 "system": system,
                 "verb": verb_name,
                 "mode": "mcp",
                 "reason": reason,
                 "request": mcp_json(&request),
-                "instruction": "Call the tool above through your own connection. The CLI could \
-                                not make the REST call itself.",
+                "instruction": instruction,
             });
             output::emit("connect", &data, |value| {
                 format!(

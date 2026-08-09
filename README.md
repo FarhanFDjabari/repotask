@@ -192,6 +192,38 @@ repo-task connect acme task --arg id=T-1
 `fields` is what keeps the result small — dotted paths, and a path through an array maps over its
 elements. Argument values are percent-encoded, so an argument cannot add path segments.
 
+### MCP-only systems
+
+A system with no usable REST API — or one the agent is already connected to over MCP — declares
+`mcp_tool` and omits `path`. Nothing is invented to satisfy a schema, and every `--arg` becomes an
+argument of the tool:
+
+```yaml
+connectors:
+  huly:
+    mode: mcp
+    mcp_server: huly
+    verbs:
+      fetch:
+        mcp_tool: get_issue
+      list:
+        mcp_tool: list_issues
+```
+
+```bash
+repo-task connect huly fetch --arg project=DIGIS --arg identifier=118
+```
+
+No REST call was attempted here, so the envelope carries `"mode": "mcp"` with no fallback warning —
+this is the configured result, not a degradation.
+
+A connector that declares a `fetch` verb also answers `repo-task fetch`, which passes the ticket as
+`identifier`:
+
+```bash
+repo-task fetch DIGIS-118 --system huly
+```
+
 ## Design
 
 ```bash

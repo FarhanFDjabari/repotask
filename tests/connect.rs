@@ -112,6 +112,132 @@ fn a_missing_argument_is_named() {
 }
 
 #[test]
+fn an_mcp_only_verb_needs_no_rest_path() {
+    let fixture = Fixture::new("connect-mcp-only");
+    with_connector(
+        &fixture,
+        "  huly:\n    mode: mcp\n    mcp_server: huly\n    verbs:\n      \
+         fetch:\n        mcp_tool: get_issue\n",
+    );
+
+    let envelope = fixture.json(&[
+        "connect",
+        "huly",
+        "fetch",
+        "--arg",
+        "project=DIGIS",
+        "--arg",
+        "identifier=118",
+    ]);
+
+    assert_eq!(envelope["ok"], true, "{envelope}");
+    assert_eq!(envelope["data"]["mode"], "mcp");
+    assert_eq!(envelope["data"]["request"]["server"], "huly");
+    assert_eq!(envelope["data"]["request"]["tool"], "get_issue");
+    assert_eq!(envelope["data"]["request"]["arguments"]["project"], "DIGIS");
+    assert_eq!(
+        envelope["data"]["request"]["arguments"]["identifier"],
+        "118"
+    );
+    assert!(
+        envelope["warnings"].as_array().unwrap().is_empty(),
+        "an mcp-mode connector never attempted REST, so nothing fell back: {envelope}"
+    );
+}
+
+#[test]
+fn doctor_accepts_an_mcp_connector_without_paths() {
+    let fixture = Fixture::new("doctor-mcp-only");
+    with_connector(
+        &fixture,
+        "  huly:\n    mode: mcp\n    verbs:\n      fetch:\n        mcp_tool: get_issue\n",
+    );
+    fixture.run(&["kb", "sync"]);
+
+    let envelope = fixture.json(&["doctor"]);
+
+    assert_eq!(envelope["ok"], true, "{envelope}");
+}
+
+#[test]
+fn a_verb_with_neither_a_path_nor_a_tool_is_rejected() {
+    let fixture = Fixture::new("connect-empty-verb");
+    with_connector(
+        &fixture,
+        "  huly:\n    mode: mcp\n    verbs:\n      fetch:\n        fields: [id]\n",
+    );
+
+    let envelope = fixture.json(&["connect", "huly"]);
+
+    assert_eq!(envelope["ok"], false, "{envelope}");
+    assert!(
+        envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("mcp_tool"),
+        "{envelope}"
+    );
+}
+
+#[test]
+fn fetch_resolves_a_declared_connector() {
+    let fixture = Fixture::new("fetch-declared");
+    with_connector(
+        &fixture,
+        "  huly:\n    mode: mcp\n    mcp_server: huly\n    verbs:\n      \
+         fetch:\n        mcp_tool: get_issue\n",
+    );
+
+    let envelope = fixture.json(&["fetch", "DIGIS-118", "--system", "huly"]);
+
+    assert_eq!(envelope["ok"], true, "{envelope}");
+    assert_eq!(envelope["data"]["mode"], "mcp");
+    assert_eq!(envelope["data"]["request"]["tool"], "get_issue");
+    assert_eq!(
+        envelope["data"]["request"]["arguments"]["identifier"], "DIGIS-118",
+        "the ticket must reach the tool as its identifier: {envelope}"
+    );
+    assert_eq!(
+        envelope["data"]["nextStep"],
+        "repo-task fetch DIGIS-118 --write -"
+    );
+}
+
+#[test]
+fn fetch_defaults_to_the_only_declared_connector() {
+    let fixture = Fixture::new("fetch-declared-default");
+    with_connector(
+        &fixture,
+        "  huly:\n    mode: mcp\n    verbs:\n      fetch:\n        mcp_tool: get_issue\n",
+    );
+
+    let envelope = fixture.json(&["fetch", "DIGIS-118"]);
+
+    assert_eq!(envelope["ok"], true, "{envelope}");
+    assert_eq!(envelope["data"]["system"], "huly");
+}
+
+#[test]
+fn fetch_on_a_declared_connector_without_a_fetch_verb_says_so() {
+    let fixture = Fixture::new("fetch-declared-no-verb");
+    with_connector(
+        &fixture,
+        "  huly:\n    mode: mcp\n    verbs:\n      list:\n        mcp_tool: list_issues\n",
+    );
+
+    let envelope = fixture.json(&["fetch", "DIGIS-118", "--system", "huly"]);
+
+    assert_eq!(envelope["ok"], false, "{envelope}");
+    assert!(
+        envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("'fetch' verb"),
+        "{envelope}"
+    );
+}
+
+#[test]
 fn a_disabled_connector_is_refused() {
     let fixture = Fixture::new("connect-off");
     with_connector(&fixture, "  acme:\n    mode: off\n");
